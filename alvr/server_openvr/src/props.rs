@@ -123,6 +123,7 @@ fn serial_number(device_id: u64) -> String {
             HeadsetEmulationMode::RiftS => "1WMGH000XX0000".into(),
             HeadsetEmulationMode::Quest1 => "1PASH0X0X00000".into(),
             HeadsetEmulationMode::Quest2 => "1WMHH000X00000".into(),
+            HeadsetEmulationMode::Quest3 => "2G0YXX0X0000XX".into(),
             HeadsetEmulationMode::QuestPro => "230YC0XXXX00XX".into(),
             HeadsetEmulationMode::Pico4 => "VRLINKHMDPICO4".into(),
             HeadsetEmulationMode::Vive => "HTCVive-001".into(),
@@ -282,6 +283,14 @@ pub extern "C" fn set_device_openvr_props(instance_ptr: *mut c_void, device_id: 
                 set_prop(ManufacturerNameString, "Oculus");
                 set_prop(RenderModelNameString, "generic_hmd");
                 set_prop(DriverVersionString, "1.55.0");
+                set_oculus_common_headset_props();
+            }
+            HeadsetEmulationMode::Quest3 => {
+                set_prop(TrackingSystemNameString, "oculus");
+                set_prop(ModelNumberString, "Meta Quest 3");
+                set_prop(ManufacturerNameString, "Meta");
+                set_prop(RenderModelNameString, "generic_hmd");
+                set_prop(DriverVersionString, "1.101.0");
                 set_oculus_common_headset_props();
             }
             HeadsetEmulationMode::QuestPro => {

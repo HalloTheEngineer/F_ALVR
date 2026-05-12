@@ -870,6 +870,8 @@ pub enum HeadsetEmulationMode {
     Quest1,
     #[schema(strings(display_name = "Quest 2"))]
     Quest2,
+    #[schema(strings(display_name = "Quest 3"))]
+    Quest3,
     #[schema(strings(display_name = "Quest Pro"))]
     QuestPro,
     #[schema(strings(display_name = "Pico 4"))]

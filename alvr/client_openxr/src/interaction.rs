@@ -36,7 +36,11 @@ fn get_controller_offset(platform: Platform, is_right_hand: bool) -> Pose {
             position: Vec3::new(-0.013, -0.005, 0.0),
             orientation: Quat::from_rotation_x(-20.0 * DEG_TO_RAD),
         },
-        // todo: check Quest 2
+        // todo: check Quest 2 and 3 offsets
+        Platform::Quest3 | Platform::Quest3S => Pose {
+            position: Vec3::new(-0.005, -0.005, 0.00),
+            orientation: Quat::from_rotation_x(-15.0 * DEG_TO_RAD),
+        },
         p if p.is_quest() => Pose {
             position: Vec3::new(-0.005, -0.005, 0.00),
             orientation: Quat::from_rotation_x(-15.0 * DEG_TO_RAD),
@@ -213,6 +217,7 @@ impl InteractionContext {
         }
 
         let controllers_profile_path = match platform {
+            Platform::Quest3 | Platform::Quest3S => QUEST_CONTROLLER_PROFILE_PATH,
             p if p.is_quest() => QUEST_CONTROLLER_PROFILE_PATH, // todo: create new controller profile for quest pro and 3
             Platform::PicoG3 => PICO_G3_CONTROLLER_PROFILE_PATH,
             Platform::PicoNeo3 => PICO_NEO3_CONTROLLER_PROFILE_PATH,
