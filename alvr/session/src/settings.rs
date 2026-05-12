@@ -799,6 +799,13 @@ pub struct AudioBufferingConfig {
     #[schema(strings(display_name = "Batch size"))]
     #[schema(gui(slider(min = 1, max = 20)), suffix = "ms")]
     pub batch_ms: u64,
+
+    #[schema(strings(
+        display_name = "Audio sync offset",
+        help = "Delays audio relative to video. Positive values push audio later. Useful for syncing audio with visual hits in rhythm games."
+    ))]
+    #[schema(gui(slider(min = 0, max = 500)), suffix = "ms")]
+    pub sync_offset_ms: u64,
 }
 
 #[derive(SettingsSchema, Serialize, Deserialize, Clone)]
@@ -1955,6 +1962,7 @@ pub fn session_settings_default() -> SettingsDefault {
                         gui_collapsed: true,
                         average_buffering_ms: 50,
                         batch_ms: 10,
+                        sync_offset_ms: 0,
                     },
                 },
             },
@@ -1973,6 +1981,7 @@ pub fn session_settings_default() -> SettingsDefault {
                         gui_collapsed: true,
                         average_buffering_ms: 50,
                         batch_ms: 10,
+                        sync_offset_ms: 0,
                     },
                 },
             },

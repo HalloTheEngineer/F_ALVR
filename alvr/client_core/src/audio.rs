@@ -157,6 +157,14 @@ pub fn play_audio_loop(
         bail!("Invalid audio configuration");
     }
 
+    // Pre-fill buffer with silence to apply audio sync offset
+    if config.sync_offset_ms > 0 {
+        let offset_frames =
+            sample_rate as usize * config.sync_offset_ms as usize / 1000;
+        let mut guard = sample_buffer.lock();
+        guard.resize(offset_frames * channels_count as usize, 0.0);
+    }
+
     stream.request_start()?;
 
     alvr_audio::receive_samples_loop(

@@ -383,11 +383,13 @@ pub fn microphone_schema() -> PresetSchemaNode {
 pub fn latency_preset_schema() -> PresetSchemaNode {
     const CTRL: &str = "session_settings.headset.controllers.content";
     const VID: &str = "session_settings.video";
+    const HEADSET: &str = "session_settings.headset";
+    const CONN: &str = "session_settings.connection";
     PresetSchemaNode::HigherOrderChoice(HigherOrderChoiceSchema {
         name: "Latency preset".into(),
         strings: [(
             "help".into(),
-            "BeatSaber: lowest latency for rhythm games. Disables prediction smoothing, zero velocity filtering, H264 CAVLC, CBR high bitrate, minimal buffering.".into(),
+            "BeatSaber: lowest latency for rhythm games. Disables prediction smoothing, zero velocity filtering, H264 CAVLC, CBR high bitrate, minimal buffering, disables hand skeleton and multimodal tracking.".into(),
         )]
         .into_iter()
         .collect(),
@@ -405,6 +407,9 @@ pub fn latency_preset_schema() -> PresetSchemaNode {
                     string_modifier(&format!("{VID}.bitrate.mode.variant"), "ConstantMbps"),
                     num_modifier(&format!("{VID}.bitrate.mode.ConstantMbps"), "500"),
                     num_modifier(&format!("{VID}.max_buffering_frames"), "1.0"),
+                    bool_modifier(&format!("{CTRL}.hand_skeleton.enabled"), false),
+                    bool_modifier(&format!("{HEADSET}.multimodal_tracking.enabled"), false),
+                    num_modifier(&format!("{CONN}.minimum_idr_interval_ms"), "30"),
                 ]
                 .into_iter()
                 .collect(),
