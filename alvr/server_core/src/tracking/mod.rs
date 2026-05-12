@@ -55,6 +55,7 @@ struct MotionConfig {
     pose_offset: Pose,
     linear_velocity_cutoff: f32,
     angular_velocity_cutoff: f32,
+    angular_velocity_smoothing: f32,
 }
 
 pub struct TrackingManager {
@@ -208,12 +209,15 @@ impl TrackingManager {
         ]);
 
         if let Switch::Enabled(controllers) = &headset_config.controllers {
+            let smoothing = controllers.angular_velocity_smoothing;
+
             device_motion_configs.insert(
                 *inp::HAND_LEFT_ID,
                 MotionConfig {
                     pose_offset: Pose::IDENTITY,
                     linear_velocity_cutoff: controllers.linear_velocity_cutoff,
                     angular_velocity_cutoff: controllers.angular_velocity_cutoff * DEG_TO_RAD,
+                    angular_velocity_smoothing: smoothing,
                 },
             );
 
@@ -223,6 +227,7 @@ impl TrackingManager {
                     pose_offset: Pose::IDENTITY,
                     linear_velocity_cutoff: controllers.linear_velocity_cutoff,
                     angular_velocity_cutoff: controllers.angular_velocity_cutoff * DEG_TO_RAD,
+                    angular_velocity_smoothing: smoothing,
                 },
             );
         }
@@ -249,6 +254,30 @@ impl TrackingManager {
                     cutoff(motion.linear_velocity, config.linear_velocity_cutoff);
                 motion.angular_velocity =
                     cutoff(motion.angular_velocity, config.angular_velocity_cutoff);
+
+                if config.angular_velocity_smoothing > 0.0 {
+                    let (adaptive_alpha, prev_av) = self
+                        .device_motions_history
+                        .get(&device_id)
+                        .and_then(|h| h.front())
+                        .map(|(prev_ts, prev_motion)| {
+                            let dt = timestamp.saturating_sub(*prev_ts).as_secs_f32();
+                            let alpha = if dt > 0.0 {
+                                let accel = (motion.angular_velocity - prev_motion.angular_velocity) / dt;
+                                // Modulate alpha inversely with angular acceleration magnitude.
+                                // High acceleration (direction change) = less smoothing.
+                                const ADAPT_K: f32 = 2.0;
+                                let factor = 1.0 / (1.0 + ADAPT_K * accel.length());
+                                config.angular_velocity_smoothing * factor
+                            } else {
+                                config.angular_velocity_smoothing
+                            };
+                            (alpha, prev_motion.angular_velocity)
+                        })
+                        .unwrap_or((config.angular_velocity_smoothing, motion.angular_velocity));
+                    motion.angular_velocity = motion.angular_velocity * (1.0 - adaptive_alpha)
+                        + prev_av * adaptive_alpha;
+                }
             }
 
             if let Some(motions) = self.device_motions_history.get_mut(&device_id) {

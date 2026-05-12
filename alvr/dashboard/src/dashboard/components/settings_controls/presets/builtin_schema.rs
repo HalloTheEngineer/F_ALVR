@@ -380,6 +380,49 @@ pub fn microphone_schema() -> PresetSchemaNode {
     })
 }
 
+pub fn latency_preset_schema() -> PresetSchemaNode {
+    const CTRL: &str = "session_settings.headset.controllers.content";
+    const VID: &str = "session_settings.video";
+    PresetSchemaNode::HigherOrderChoice(HigherOrderChoiceSchema {
+        name: "Latency preset".into(),
+        strings: [(
+            "help".into(),
+            "BeatSaber: lowest latency for rhythm games. Disables prediction smoothing, zero velocity filtering, H264 CAVLC, CBR high bitrate, minimal buffering.".into(),
+        )]
+        .into_iter()
+        .collect(),
+        flags: ["steamvr-restart".into()].into_iter().collect(),
+        options: [
+            HigherOrderChoiceOption {
+                display_name: "BeatSaber".into(),
+                modifiers: vec![
+                    num_modifier(&format!("{CTRL}.steamvr_pipeline_frames"), "1.0"),
+                    num_modifier(&format!("{CTRL}.linear_velocity_cutoff"), "0.0"),
+                    num_modifier(&format!("{CTRL}.angular_velocity_cutoff"), "0.0"),
+                    num_modifier(&format!("{CTRL}.angular_velocity_smoothing"), "0.4"),
+                    string_modifier(&format!("{VID}.preferred_codec.variant"), "H264"),
+                    string_modifier(&format!("{VID}.encoder_config.entropy_coding.variant"), "Cavlc"),
+                    string_modifier(&format!("{VID}.bitrate.mode.variant"), "ConstantMbps"),
+                    num_modifier(&format!("{VID}.bitrate.mode.ConstantMbps"), "500"),
+                    num_modifier(&format!("{VID}.max_buffering_frames"), "1.0"),
+                ]
+                .into_iter()
+                .collect(),
+                content: None,
+            },
+            HigherOrderChoiceOption {
+                display_name: "Custom".into(),
+                modifiers: vec![],
+                content: None,
+            },
+        ]
+        .into_iter()
+        .collect(),
+        default_option_display_name: "Custom".into(),
+        gui: ChoiceControlType::ButtonGroup,
+    })
+}
+
 pub fn hand_tracking_interaction_schema() -> PresetSchemaNode {
     const HELP: &str = r"Disabled: hands cannot emulate buttons. Useful for using Joy-Cons or other non-native controllers.
 SteamVR Input 2.0: create separate SteamVR devices for hand tracking.

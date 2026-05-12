@@ -31,6 +31,7 @@ pub struct SettingsTab {
     codec_preset: PresetControl,
     game_audio_preset: PresetControl,
     microphone_preset: PresetControl,
+    latency_preset: PresetControl,
     hand_tracking_interaction_preset: PresetControl,
     eye_face_tracking_preset: PresetControl,
     top_level_entries: Vec<TopLevelEntry>,
@@ -76,6 +77,7 @@ impl SettingsTab {
             codec_preset: PresetControl::new(builtin_schema::codec_preset_schema()),
             game_audio_preset: PresetControl::new(builtin_schema::game_audio_schema()),
             microphone_preset: PresetControl::new(builtin_schema::microphone_schema()),
+            latency_preset: PresetControl::new(builtin_schema::latency_preset_schema()),
             hand_tracking_interaction_preset: PresetControl::new(
                 builtin_schema::hand_tracking_interaction_schema(),
             ),
@@ -100,6 +102,8 @@ impl SettingsTab {
         self.game_audio_preset
             .update_session_settings(&settings_json);
         self.microphone_preset
+            .update_session_settings(&settings_json);
+        self.latency_preset
             .update_session_settings(&settings_json);
         self.hand_tracking_interaction_preset
             .update_session_settings(&settings_json);
@@ -172,6 +176,9 @@ impl SettingsTab {
                             ui.end_row();
 
                             path_value_pairs.extend(self.microphone_preset.ui(ui));
+                            ui.end_row();
+
+                            path_value_pairs.extend(self.latency_preset.ui(ui));
                             ui.end_row();
 
                             path_value_pairs.extend(self.hand_tracking_interaction_preset.ui(ui));
