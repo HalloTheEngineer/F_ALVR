@@ -77,7 +77,7 @@ impl StatisticsManager {
             video_bytes_partial_sum: 0,
             battery_gauges: HashMap::new(),
             steamvr_pipeline_latency: Duration::from_secs_f32(
-                steamvr_pipeline_frames * nominal_server_frame_interval.as_secs_f32(),
+                steamvr_pipeline_frames.max(0.0) * nominal_server_frame_interval.as_secs_f32(),
             ),
             motion_to_photon_latency_average: SlidingWindowAverage::new(
                 Duration::ZERO,
@@ -289,6 +289,10 @@ impl StatisticsManager {
 
     pub fn motion_to_photon_latency_average(&self) -> Duration {
         self.motion_to_photon_latency_average.get_average()
+    }
+
+    pub fn frame_interval(&self) -> Duration {
+        self.frame_interval
     }
 
     pub fn tracker_pose_time_offset(&self) -> Duration {

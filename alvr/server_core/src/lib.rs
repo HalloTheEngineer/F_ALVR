@@ -310,6 +310,15 @@ impl ServerCoreContext {
             .unwrap_or_default()
     }
 
+    pub fn get_frame_interval(&self) -> Duration {
+        self.connection_context
+            .statistics_manager
+            .read()
+            .as_ref()
+            .map(|stats| stats.frame_interval())
+            .unwrap_or(Duration::from_secs_f32(1.0 / 90.0))
+    }
+
     pub fn send_haptics(&self, haptics: Haptics) {
         dbg_server_core!("send_haptics");
 

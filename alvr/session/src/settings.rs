@@ -1204,11 +1204,11 @@ pub struct ControllersConfig {
 
     #[schema(strings(
         display_name = "Prediction",
-        help = r"Higher values make the controllers track smoother.
+        help = r"Higher values make the controllers track smoother. Negative values delay the controller pose, producing a 'heavy' controller feel.
 Technically, this is the time (counted in frames) between pose submitted to SteamVR and the corresponding virtual vsync happens.
 Currently this cannot be reliably estimated automatically. The correct value should be 2 but 3 is default for smoother tracking at the cost of slight lag."
     ))]
-    #[schema(gui(slider(min = 0.0, max = 10.0, logarithmic)), suffix = "frames")]
+    #[schema(gui(slider(min = -2.0, max = 10.0, step = 0.1)), suffix = "frames")]
     pub steamvr_pipeline_frames: f32,
 
     #[schema(flag = "real-time")]
@@ -1237,9 +1237,17 @@ Currently this cannot be reliably estimated automatically. The correct value sho
         help = r"Smooths controller rotational velocity across frames to reduce wobble during steady swings.
 Higher values produce smoother rotation at the cost of slower direction changes.
 0 = no smoothing (instant response), 0.9 = heavy smoothing."
-    ))]
+    )    )]
     #[schema(gui(slider(min = 0.0, max = 0.99, step = 0.01)))]
     pub angular_velocity_smoothing: f32,
+
+    #[schema(flag = "real-time")]
+    #[schema(strings(
+        display_name = "Saber reach",
+        help = "Moves the saber forward/backward in the controller's grip direction. Positive = saber extends further forward. Applied on top of the controller position offset."
+    ))]
+    #[schema(gui(slider(min = -0.2, max = 0.2, step = 0.001)), suffix = "m")]
+    pub saber_reach_offset: f32,
 
     #[schema(flag = "real-time")]
     #[schema(strings(help = "Right controller offset is mirrored horizontally"))]
@@ -2153,6 +2161,7 @@ pub fn session_settings_default() -> SettingsDefault {
                     linear_velocity_cutoff: 0.05,
                     angular_velocity_cutoff: 10.0,
                     angular_velocity_smoothing: 0.0,
+                    saber_reach_offset: 0.0,
                     left_controller_position_offset: ArrayDefault {
                         gui_collapsed: true,
                         content: [0.0, 0.0, -0.11],

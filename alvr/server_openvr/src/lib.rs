@@ -99,8 +99,23 @@ fn event_loop(events_receiver: mpsc::Receiver<ServerCoreEvent>) {
                             poll_timestamp + context.get_motion_to_photon_latency();
                         let controllers_pose_time_offset = context.get_tracker_pose_time_offset();
                         // We need to remove the additional offset that SteamVR adds
-                        let target_controller_timestamp =
+                        let mut target_controller_timestamp =
                             target_timestamp.saturating_sub(controllers_pose_time_offset);
+
+                        // Negative pipeline frames: add extra delay (controller lags behind head)
+                        let pipeline_frames = alvr_server_core::settings()
+                            .headset
+                            .controllers
+                            .as_option()
+                            .map(|c| c.steamvr_pipeline_frames)
+                            .unwrap_or(0.0);
+                        if pipeline_frames < 0.0 {
+                            let extra_delay = Duration::from_secs_f32(
+                                -pipeline_frames * context.get_frame_interval().as_secs_f32(),
+                            );
+                            target_controller_timestamp =
+                                target_controller_timestamp.saturating_sub(extra_delay);
+                        }
 
                         let ffi_head_motion = if let Some(motion) =
                             context.get_device_motion(*HEAD_ID, poll_timestamp)

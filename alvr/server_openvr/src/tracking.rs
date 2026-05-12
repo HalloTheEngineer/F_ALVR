@@ -269,7 +269,8 @@ pub fn offset_controller_motion(
     device_id: u64,
     motion: DeviceMotion,
 ) -> DeviceMotion {
-    let t = config.left_controller_position_offset;
+    let mut t = config.left_controller_position_offset;
+    t[2] += config.saber_reach_offset;
     let r = config.left_controller_rotation_offset;
 
     let pose_offset = if device_id == *HAND_LEFT_ID {
