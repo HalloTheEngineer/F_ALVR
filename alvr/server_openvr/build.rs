@@ -67,13 +67,22 @@ fn main() {
         .include("cpp");
 
     if platform_name == "windows" {
-        build
-            .debug(false) // This is because we cannot link to msvcrtd (see below)
-            .flag("/permissive-")
-            .define("NOMINMAX", None)
-            .define("_WINSOCKAPI_", None)
-            .define("_MBCS", None)
-            .define("_MT", None);
+        let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+        if target_env == "msvc" {
+            build
+                .debug(false)
+                .flag("/permissive-")
+                .define("NOMINMAX", None)
+                .define("_WINSOCKAPI_", None)
+                .define("_MBCS", None)
+                .define("_MT", None);
+        } else {
+            build
+                .define("NOMINMAX", None)
+                .define("_WINSOCKAPI_", None)
+                .define("_MBCS", None)
+                .define("_MT", None);
+        }
     } else if platform_name == "macos" {
         build.define("__APPLE__", None);
     }
