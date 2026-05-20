@@ -90,43 +90,60 @@ impl Control {
     pub fn update_session_settings(&mut self, session_setting_json: &json::Value) {
         let mut selected_option = String::new();
 
-        'outer: for (key, descs) in &self.modifiers {
-            for desc in descs {
-                let mut session_ref = session_setting_json;
-
-                // Note: the first path segment is always "settings_schema". Skip that.
-                for segment in &desc.path[1..] {
-                    session_ref = match segment {
-                        PathSegment::Name(name) => {
-                            if let Some(name) = session_ref.get(name) {
-                                name
-                            } else {
-                                continue 'outer;
-                            }
-                        }
-                        PathSegment::Index(index) => {
-                            if let Some(index) = session_ref.get(index) {
-                                index
-                            } else {
-                                continue 'outer;
-                            }
-                        }
-                    };
-                }
-
-                if !components::json_values_eq(session_ref, &desc.value) {
-                    continue 'outer;
-                }
+        // First pass: try presets with non-empty modifiers (exact matches)
+        for (key, descs) in &self.modifiers {
+            if descs.is_empty() {
+                continue;
             }
-
-            // At this point the session matches all modifiers
-            selected_option.clone_from(key);
-
-            break;
+            if Self::matches_all(session_setting_json, descs) {
+                selected_option.clone_from(key);
+                break;
+            }
         }
 
-        // Note: if no modifier matched, the control will unselect all options
+        // Second pass: fall back to empty-modifier presets (e.g. "Custom")
+        if selected_option.is_empty() {
+            for (key, descs) in &self.modifiers {
+                if descs.is_empty() {
+                    selected_option.clone_from(key);
+                    break;
+                }
+            }
+        }
+
         self.preset_json[&self.name]["variant"] = json::Value::String(selected_option);
+    }
+
+    fn matches_all(session_setting_json: &json::Value, descs: &[PathValuePair]) -> bool {
+        for desc in descs {
+            let mut session_ref = session_setting_json;
+
+            // Note: the first path segment is always "settings_schema". Skip that.
+            for segment in &desc.path[1..] {
+                session_ref = match segment {
+                    PathSegment::Name(name) => {
+                        if let Some(name) = session_ref.get(name) {
+                            name
+                        } else {
+                            return false;
+                        }
+                    }
+                    PathSegment::Index(index) => {
+                        if let Some(index) = session_ref.get(index) {
+                            index
+                        } else {
+                            return false;
+                        }
+                    }
+                };
+            }
+
+            if !components::json_values_eq(session_ref, &desc.value) {
+                return false;
+            }
+        }
+
+        true
     }
 
     pub fn ui(&mut self, ui: &mut Ui) -> Vec<PathValuePair> {
