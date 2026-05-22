@@ -160,6 +160,17 @@ fn connection_pipeline(
     let microphone_sample_rate =
         alvr_audio::input_sample_rate(&alvr_audio::new_input(None).to_con()?).to_con()?;
 
+    let wired_client = proto_control_socket
+        .local_addr()
+        .is_ok_and(|ip| match ip {
+            std::net::IpAddr::V4(v4) => {
+                let octets = v4.octets();
+                // Common Android USB tethering subnet (RNDIS)
+                octets[0] == 192 && octets[1] == 168 && octets[2] == 42
+            }
+            std::net::IpAddr::V6(_) => false,
+        });
+
     dbg_connection!("connection_pipeline: Send stream capabilities");
     proto_control_socket
         .send(&ClientConnectionResult::ConnectionAccepted(Box::new(
@@ -180,6 +191,7 @@ fn connection_pipeline(
                         prefer_10bit: capabilities.prefer_10bit,
                         preferred_encoding_gamma: capabilities.preferred_encoding_gamma,
                         prefer_hdr: capabilities.prefer_hdr,
+                        wired: wired_client,
                         ext_str: String::new(),
                     }
                     .with_ext(VideoStreamingCapabilitiesExt {}),

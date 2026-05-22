@@ -209,6 +209,10 @@ impl ProtoControlSocket {
         Ok((Self { inner: socket }, peer_ip))
     }
 
+    pub fn local_addr(&self) -> std::io::Result<std::net::IpAddr> {
+        self.inner.local_addr().map(|a| a.ip())
+    }
+
     pub fn send<S: Serialize>(&mut self, packet: &S) -> Result<()> {
         framed_send(&mut self.inner, &mut vec![], packet)
     }
