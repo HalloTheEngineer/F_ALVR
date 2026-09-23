@@ -529,6 +529,10 @@ pub fn entry_point(telemetry_base_dir: Option<PathBuf>) {
                         }
                     }
                     ClientCoreEvent::RealTimeConfig(config) => {
+                        if let Some(max_prediction_ms) = config.max_prediction_ms {
+                            core_context.set_max_prediction(max_prediction_ms);
+                        }
+
                         if config.passthrough.is_some() && passthrough_layer.is_none() {
                             passthrough_layer = PassthroughLayer::new(&xr_session, platform).ok();
                         } else if config.passthrough.is_none() && passthrough_layer.is_some() {

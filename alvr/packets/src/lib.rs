@@ -400,6 +400,8 @@ pub struct RealTimeConfig {
     pub clientside_post_processing: Option<ClientsidePostProcessingConfig>,
     pub cpu_performance_level: Option<PerformanceLevel>,
     pub gpu_performance_level: Option<PerformanceLevel>,
+    pub input_poll_divisor: Option<u32>,
+    pub max_prediction_ms: Option<u64>,
     pub ext_str: String,
 }
 
@@ -414,6 +416,12 @@ impl RealTimeConfig {
                 .into_option(),
             cpu_performance_level: settings.headset.performance_level.clone().cpu.into_option(),
             gpu_performance_level: settings.headset.performance_level.clone().gpu.into_option(),
+            input_poll_divisor: settings
+                .headset
+                .controllers
+                .as_option()
+                .map(|config| config.input_poll_divisor),
+            max_prediction_ms: Some(settings.headset.max_prediction_ms),
             ext_str: String::new(), // No extensions for now
         }
     }

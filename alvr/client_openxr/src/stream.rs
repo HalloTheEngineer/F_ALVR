@@ -25,7 +25,10 @@ use openxr as xr;
 use std::{
     ptr,
     rc::Rc,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU32, Ordering},
+    },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
 };
@@ -98,6 +101,7 @@ pub struct StreamContext {
     last_good_video_frame_metadata: VideoFrameMetadata,
     input_thread: Option<JoinHandle<()>>,
     input_thread_running: Arc<RelaxedAtomic>,
+    input_poll_divisor: Arc<AtomicU32>,
     config: ParsedStreamConfig,
     target_view_resolution: UVec2,
     renderer: StreamRenderer,
@@ -245,6 +249,7 @@ impl StreamContext {
             },
             input_thread: None,
             input_thread_running,
+            input_poll_divisor: Arc::new(AtomicU32::new(config.input_poll_divisor)),
             config,
             target_view_resolution,
             renderer,
@@ -292,7 +297,7 @@ impl StreamContext {
             let stage_reference_space = Arc::clone(&self.stage_reference_space);
             let view_reference_space = Arc::clone(&self.view_reference_space);
             let refresh_rate = self.config.refresh_rate_hint;
-            let input_poll_divisor = self.config.input_poll_divisor;
+            let input_poll_divisor = Arc::clone(&self.input_poll_divisor);
             let running = Arc::clone(&self.input_thread_running);
             move || {
                 stream_input_loop(
@@ -344,6 +349,11 @@ impl StreamContext {
     pub fn update_real_time_config(&mut self, config: &RealTimeConfig) {
         self.config.passthrough = config.passthrough.clone();
         self.config.clientside_post_processing = config.clientside_post_processing.clone();
+
+        if let Some(divisor) = config.input_poll_divisor {
+            self.input_poll_divisor
+                .store(divisor.max(1), Ordering::Relaxed);
+        }
     }
 
     pub fn render(
@@ -544,7 +554,7 @@ fn stream_input_loop(
     stage_reference_space: &xr::Space,
     view_reference_space: &xr::Space,
     refresh_rate: f32,
-    input_poll_divisor: u32,
+    input_poll_divisor: Arc<AtomicU32>,
     running: Arc<RelaxedAtomic>,
 ) {
     let mut last_controller_poses = [Pose::IDENTITY; 2];
@@ -774,7 +784,7 @@ fn stream_input_loop(
             core_ctx.send_buttons(button_entries);
         }
 
-        deadline += frame_interval / input_poll_divisor;
+        deadline += frame_interval / input_poll_divisor.load(Ordering::Relaxed).max(1);
         thread::sleep(deadline.saturating_duration_since(Instant::now()));
     }
 }

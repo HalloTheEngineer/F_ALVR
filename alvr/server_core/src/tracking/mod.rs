@@ -18,7 +18,7 @@ use alvr_common::{
     inputs as inp, unix_timestamp_ms,
 };
 use alvr_events::{EventType, TrackingEvent};
-use alvr_packets::TrackingData;
+use alvr_packets::{Haptics, TrackingData};
 use alvr_session::{
     BodyTrackingConfig, HeadsetConfig, PredictionMode, RecenteringMode, Settings, VMCConfig,
     settings_schema::Switch,
@@ -417,6 +417,7 @@ pub fn tracking_loop(
 
     let mut last_recv_instant: Option<Instant> = None;
     let mut last_poll_timestamp: Option<Duration> = None;
+    let mut last_resistance_haptic_instant: [Option<Instant>; 2] = [None, None];
 
     while is_streaming() {
         let data = match tracking_receiver.recv(STREAMING_RECV_TIMEOUT) {
@@ -508,6 +509,62 @@ pub fn tracking_loop(
             }
             if let Some(skeleton) = tracking.hand_skeletons[1] {
                 tracking_manager_lock.report_hand_skeleton(HandType::Right, timestamp, skeleton);
+            }
+
+            // Saber resistance: haptic cue that grows with the deviation of the controller up
+            // axis from vertical. Silenced while swinging fast, so it only acts as a positioning
+            // cue between swings.
+            if let Some(controllers) = &controllers_config
+                && let Switch::Enabled(resistance) = &controllers.saber_resistance
+            {
+                const PULSE_INTERVAL: Duration = Duration::from_millis(50);
+                const MAX_DEVIATION: f32 = 60.0;
+                const PULSE_FREQUENCY: f32 = 90.0;
+                const MAX_AMPLITUDE: f32 = 0.5;
+                let now = Instant::now();
+
+                for (hand_idx, device_id) in
+                    [(0usize, *inp::HAND_LEFT_ID), (1usize, *inp::HAND_RIGHT_ID)]
+                {
+                    if last_resistance_haptic_instant[hand_idx].is_some_and(|instant| {
+                        now.saturating_duration_since(instant) < PULSE_INTERVAL
+                    }) {
+                        continue;
+                    }
+
+                    let Some(motion) =
+                        tracking_manager_lock.get_device_motion(device_id, timestamp, false)
+                    else {
+                        continue;
+                    };
+
+                    let angular_velocity_deg_s = motion.angular_velocity.length() / DEG_TO_RAD;
+                    if angular_velocity_deg_s >= resistance.velocity_gate_deg_s {
+                        continue;
+                    }
+
+                    let up_axis = motion.pose.orientation * Vec3::Y;
+                    let deviation_deg = up_axis.angle_between(Vec3::Y).to_degrees();
+                    if deviation_deg <= resistance.deadzone_deg {
+                        continue;
+                    }
+
+                    let ramp =
+                        ((deviation_deg - resistance.deadzone_deg) / MAX_DEVIATION).clamp(0.0, 1.0);
+                    let amplitude = resistance.strength * ramp * MAX_AMPLITUDE;
+
+                    if let Some(sender) = &mut *ctx.haptics_sender.lock() {
+                        sender
+                            .send_header(&Haptics {
+                                device_id,
+                                duration: PULSE_INTERVAL,
+                                frequency: PULSE_FREQUENCY,
+                                amplitude,
+                            })
+                            .ok();
+                        last_resistance_haptic_instant[hand_idx] = Some(now);
+                    }
+                }
             }
 
             if let Some(sink) = &mut face_tracking_sink {

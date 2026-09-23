@@ -147,6 +147,10 @@ impl ClientCoreContext {
         *self.lifecycle_state.write() = LifecycleState::Resumed;
     }
 
+    pub fn set_max_prediction(&self, max_prediction_ms: u64) {
+        *self.connection_context.max_prediction.write() = Duration::from_millis(max_prediction_ms);
+    }
+
     pub fn pause(&self) {
         dbg_client_core!("pause");
 

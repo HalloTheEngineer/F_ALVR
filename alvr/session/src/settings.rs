@@ -1132,6 +1132,21 @@ pub struct HandTrackingInteractionConfig {
     pub repeat_delay: u32,
 }
 
+#[derive(SettingsSchema, Serialize, Deserialize, Clone, Copy, PartialEq)]
+#[schema(collapsible)]
+pub struct SaberResistanceConfig {
+    #[schema(gui(slider(min = 0.0, max = 1.0, step = 0.05)))]
+    pub strength: f32,
+
+    #[schema(strings(display_name = "Deadzone"))]
+    #[schema(gui(slider(min = 0.0, max = 45.0, step = 1.0)), suffix = "°")]
+    pub deadzone_deg: f32,
+
+    #[schema(strings(display_name = "Swing gate"))]
+    #[schema(gui(slider(min = 30.0, max = 1000.0, step = 10.0)), suffix = "°/s")]
+    pub velocity_gate_deg_s: f32,
+}
+
 #[derive(SettingsSchema, Serialize, Deserialize, Clone)]
 #[schema(collapsible)]
 pub struct HapticsConfig {
@@ -1191,14 +1206,17 @@ Technically, this is the time (counted in frames) between pose submitted to Stea
 Currently this cannot be reliably estimated automatically. The correct value should be 2 but 3 is default for smoother tracking at the cost of slight lag."
     ))]
     #[schema(gui(slider(min = 1.0, max = 10.0, logarithmic)), suffix = "frames")]
+    #[schema(flag = "real-time")]
     pub steamvr_pipeline_frames: f32,
 
+    #[schema(flag = "real-time")]
     pub prediction_mode: PredictionMode,
 
     #[schema(strings(
         help = r"Interpolate the controller pose between tracking samples, instead of using the
 closest sample. Reduces pose quantization noise, can add a small amount of lag."
     ))]
+    #[schema(flag = "real-time")]
     pub sample_interpolation: bool,
 
     #[schema(strings(
@@ -1206,7 +1224,15 @@ closest sample. Reduces pose quantization noise, can add a small amount of lag."
 give the streamer fresher samples at the cost of slightly higher bandwidth and CPU usage."
     ))]
     #[schema(gui(slider(min = 1, max = 6)))]
+    #[schema(flag = "real-time")]
     pub input_poll_divisor: u32,
+
+    #[schema(strings(
+        help = r"Haptic resistance cue that grows with the deviation of the controller from a
+vertical saber position. Silenced while swinging fast. Applies in real time."
+    ))]
+    #[schema(flag = "real-time")]
+    pub saber_resistance: Switch<SaberResistanceConfig>,
 
     #[schema(flag = "real-time")]
     pub haptics: Switch<HapticsConfig>,
@@ -1349,6 +1375,7 @@ Because of runtime limitations, this option is ignored when body tracking is act
         help = "Maximum prediction for head and controllers. Used to avoid too much jitter during loading."
     ))]
     #[schema(gui(slider(min = 0, max = 200, step = 5)), suffix = "ms")]
+    #[schema(flag = "real-time")]
     pub max_prediction_ms: u64,
 }
 
@@ -2145,6 +2172,15 @@ pub fn session_settings_default() -> SettingsDefault {
                     },
                     sample_interpolation: false,
                     input_poll_divisor: 3,
+                    saber_resistance: SwitchDefault {
+                        enabled: false,
+                        content: SaberResistanceConfigDefault {
+                            gui_collapsed: true,
+                            strength: 0.5,
+                            deadzone_deg: 10.0,
+                            velocity_gate_deg_s: 300.0,
+                        },
+                    },
                     linear_velocity_cutoff: 0.05,
                     angular_velocity_cutoff: 10.0,
                     left_controller_position_offset: ArrayDefault {
