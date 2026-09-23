@@ -378,6 +378,12 @@ fn get_android_openxr_loaders(selection: OpenXRLoadersSelection) {
     );
 
     if matches!(selection, OpenXRLoadersSelection::OnlyGeneric) {
+        // Remove loaders of other platforms, in case they were downloaded by a previous
+        // non-lite prepare-deps run
+        let destination_dir = afs::deps_dir().join("android_openxr/arm64-v8a");
+        for suffix in ["_quest1", "_pico_old", "_yvr"] {
+            fs::remove_file(destination_dir.join(format!("libopenxr_loader{suffix}.so"))).ok();
+        }
         return;
     }
 

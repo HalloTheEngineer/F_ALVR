@@ -9,6 +9,11 @@ license.workspace = true
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+# Lite build: requests only the OpenXR extensions needed for controller based VR (no body/face/
+# eye tracking, no passthrough, no multimodal input) and ships only the generic OpenXR loader.
+lite = ["alvr_client_core/lite"]
+
 [dependencies]
 alvr_common.workspace = true
 alvr_client_core.workspace = true

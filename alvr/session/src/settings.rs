@@ -1193,6 +1193,21 @@ Currently this cannot be reliably estimated automatically. The correct value sho
     #[schema(gui(slider(min = 1.0, max = 10.0, logarithmic)), suffix = "frames")]
     pub steamvr_pipeline_frames: f32,
 
+    pub prediction_mode: PredictionMode,
+
+    #[schema(strings(
+        help = r"Interpolate the controller pose between tracking samples, instead of using the
+closest sample. Reduces pose quantization noise, can add a small amount of lag."
+    ))]
+    pub sample_interpolation: bool,
+
+    #[schema(strings(
+        help = r"How many times per frame the tracking input is sampled and sent. Higher values
+give the streamer fresher samples at the cost of slightly higher bandwidth and CPU usage."
+    ))]
+    #[schema(gui(slider(min = 1, max = 6)))]
+    pub input_poll_divisor: u32,
+
     #[schema(flag = "real-time")]
     pub haptics: Switch<HapticsConfig>,
 
@@ -1239,6 +1254,17 @@ Currently this cannot be reliably estimated automatically. The correct value sho
     pub button_mappings: Option<Vec<(String, Vec<ButtonBindingTarget>)>>,
 
     pub button_mapping_config: AutomaticButtonMappingConfig,
+}
+
+#[repr(u8)]
+#[derive(SettingsSchema, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
+#[schema(gui = "button_group")]
+pub enum PredictionMode {
+    #[default]
+    #[schema(strings(display_name = "Linear"))]
+    Linear = 0,
+    #[schema(strings(display_name = "Quadratic"))]
+    Quadratic = 1,
 }
 
 #[derive(SettingsSchema, Serialize, Deserialize, Clone)]
@@ -2114,6 +2140,11 @@ pub fn session_settings_default() -> SettingsDefault {
                         },
                     },
                     steamvr_pipeline_frames: 2.1,
+                    prediction_mode: PredictionModeDefault {
+                        variant: PredictionModeDefaultVariant::Linear,
+                    },
+                    sample_interpolation: false,
+                    input_poll_divisor: 3,
                     linear_velocity_cutoff: 0.05,
                     angular_velocity_cutoff: 10.0,
                     left_controller_position_offset: ArrayDefault {

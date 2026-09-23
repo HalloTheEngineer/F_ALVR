@@ -51,7 +51,6 @@ pub struct StatisticsManager {
     video_bytes_total: usize,
     video_bytes_partial_sum: usize,
     battery_gauges: HashMap<u64, BatteryData>,
-    steamvr_pipeline_latency: Duration,
     motion_to_photon_latency_average: SlidingWindowAverage<Duration>,
     last_vsync_time: Instant,
     frame_interval: Duration,
@@ -63,7 +62,6 @@ impl StatisticsManager {
     pub fn new(
         max_history_size: usize,
         nominal_server_frame_interval: Duration,
-        steamvr_pipeline_frames: f32,
     ) -> Self {
         Self {
             history_buffer: VecDeque::new(),
@@ -76,9 +74,6 @@ impl StatisticsManager {
             video_bytes_total: 0,
             video_bytes_partial_sum: 0,
             battery_gauges: HashMap::new(),
-            steamvr_pipeline_latency: Duration::from_secs_f32(
-                steamvr_pipeline_frames * nominal_server_frame_interval.as_secs_f32(),
-            ),
             motion_to_photon_latency_average: SlidingWindowAverage::new(
                 Duration::ZERO,
                 max_history_size,
@@ -291,9 +286,8 @@ impl StatisticsManager {
         self.motion_to_photon_latency_average.get_average()
     }
 
-    pub fn tracker_pose_time_offset(&self) -> Duration {
-        // This is the opposite of the client's StatisticsManager::tracker_prediction_offset().
-        self.steamvr_pipeline_latency
+    pub fn frame_interval(&self) -> Duration {
+        self.frame_interval
     }
 
     // NB: this call is non-blocking, waiting should be done externally

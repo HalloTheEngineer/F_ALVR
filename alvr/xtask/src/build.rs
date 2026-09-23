@@ -349,7 +349,7 @@ pub fn build_android_client_openxr_lib(profile: Profile, link_stdcpp: bool) {
     build_android_lib_impl("client_openxr", profile, link_stdcpp, false)
 }
 
-pub fn build_android_client(profile: Profile) {
+pub fn build_client(profile: Profile, lite: bool) {
     let sh = Shell::new().unwrap();
 
     let mut flags = vec![];
@@ -360,6 +360,10 @@ pub fn build_android_client(profile: Profile) {
         }
         Profile::Release => flags.push("--release"),
         Profile::Debug => (),
+    }
+    if lite {
+        flags.push("--features");
+        flags.push("lite");
     }
     let flags_ref = &flags;
 

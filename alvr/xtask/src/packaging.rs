@@ -150,7 +150,7 @@ pub fn package_client_openxr(flavor: ReleaseFlavor, skip_admin_priv: bool) {
         replace_client_openxr_manifest(r#"value = "all""#, r#"value = "quest2|questpro|quest3""#);
     }
 
-    build::build_android_client(Profile::Distribution);
+    build::build_client(Profile::Distribution, false);
 }
 
 pub fn package_client_lib(link_stdcpp: bool, all_targets: bool) {

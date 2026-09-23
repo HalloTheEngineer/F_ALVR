@@ -55,6 +55,8 @@ FLAGS:
     --ci                Do some CI related tweaks. Depends on the other flags and subcommand
     --no-stdcpp         Disable linking to libc++_shared with build-client-lib
     --all-targets       For prepare-deps and build-client-lib subcommand, will build for all android supported ABI targets
+    --lite              For prepare-deps and build-client subcommand, build a lite client that ships only the generic
+                        OpenXR loader and skips useless extensions (no body/face/eye tracking, no passthrough)
     --meta-store        For package-client subcommand, build for Meta Store
     --pico-store        For package-client subcommand, build for Pico Store
 
@@ -184,6 +186,7 @@ fn main() {
         let keep_config = args.contains("--keep-config");
         let link_stdcpp = !args.contains("--no-stdcpp");
         let all_targets = args.contains("--all-targets");
+        let lite = args.contains("--lite");
 
         let platform: Option<String> = args.opt_value_from_str("--platform").unwrap();
         let platform = platform.as_deref().map(|platform| match platform {
@@ -208,24 +211,22 @@ fn main() {
         if args.finish().is_empty() {
             match subcommand.as_str() {
                 "prepare-deps" => {
+                    let loaders_selection = if lite {
+                        dependencies::OpenXRLoadersSelection::OnlyGeneric
+                    } else {
+                        dependencies::OpenXRLoadersSelection::All
+                    };
+
                     if let Some(platform) = platform {
                         if matches!(platform, BuildPlatform::Android) {
-                            dependencies::build_android_deps(
-                                for_ci,
-                                all_targets,
-                                OpenXRLoadersSelection::All,
-                            );
+                            dependencies::build_android_deps(for_ci, all_targets, loaders_selection);
                         } else {
                             dependencies::prepare_server_deps(Some(platform), for_ci, !no_nvidia);
                         }
                     } else {
                         dependencies::prepare_server_deps(platform, for_ci, !no_nvidia);
 
-                        dependencies::build_android_deps(
-                            for_ci,
-                            all_targets,
-                            OpenXRLoadersSelection::All,
-                        );
+                        dependencies::build_android_deps(for_ci, all_targets, loaders_selection);
                     }
                 }
                 "build-streamer" => {
@@ -233,7 +234,7 @@ fn main() {
                 }
                 "build-launcher" => build::build_launcher(profile, false),
                 "build-server-lib" => build::build_server_lib(profile, None, false),
-                "build-client" => build::build_android_client(profile),
+                "build-client" => build::build_client(profile, lite),
                 "build-client-lib" => {
                     build::build_android_client_core_lib(profile, link_stdcpp, all_targets)
                 }

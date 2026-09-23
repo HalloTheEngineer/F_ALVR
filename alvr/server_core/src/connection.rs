@@ -952,11 +952,6 @@ fn connection_pipeline(
     *ctx.statistics_manager.write() = Some(StatisticsManager::new(
         initial_settings.connection.statistics_history_size,
         Duration::from_secs_f32(1.0 / fps),
-        if let Switch::Enabled(config) = &initial_settings.headset.controllers {
-            config.steamvr_pipeline_frames
-        } else {
-            0.0
-        },
     ));
     *ctx.bitrate_manager.lock() =
         BitrateManager::new(initial_settings.video.bitrate.history_size, fps);

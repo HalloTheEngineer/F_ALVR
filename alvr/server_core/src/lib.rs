@@ -30,7 +30,9 @@ use alvr_packets::{
     VideoPacketHeader,
 };
 use alvr_server_io::ServerSessionManager;
-use alvr_session::{CodecType, H264Profile, OpenvrProperty, Settings, SteamvrHmdInitConfig};
+use alvr_session::{
+    CodecType, H264Profile, OpenvrProperty, PredictionMode, Settings, SteamvrHmdInitConfig,
+};
 use alvr_sockets::StreamSender;
 use bitrate::{BitrateManager, DynamicEncoderParams};
 use serde_json::json;
@@ -215,11 +217,6 @@ impl ServerCoreContext {
         let stats = StatisticsManager::new(
             initial_settings.connection.statistics_history_size,
             Duration::from_secs_f32(1.0 / 90.0),
-            if let Switch::Enabled(config) = &initial_settings.headset.controllers {
-                config.steamvr_pipeline_frames
-            } else {
-                0.0
-            },
         );
 
         let connection_context = Arc::new(ConnectionContext {
@@ -276,10 +273,46 @@ impl ServerCoreContext {
     ) -> Option<DeviceMotion> {
         dbg_server_core!("get_device_motion: dev={device_id} sample_ts={sample_timestamp:?}");
 
+        let sample_interpolation = SESSION_MANAGER
+            .read()
+            .settings()
+            .headset
+            .controllers
+            .as_option()
+            .is_some_and(|config| config.sample_interpolation);
+
         self.connection_context
             .tracking_manager
             .read()
-            .get_device_motion(device_id, sample_timestamp)
+            .get_device_motion(device_id, sample_timestamp, sample_interpolation)
+    }
+
+    pub fn get_extrapolated_device_motion(
+        &self,
+        device_id: u64,
+        sample_timestamp: Duration,
+        target_timestamp: Duration,
+    ) -> Option<DeviceMotion> {
+        dbg_server_core!("get_extrapolated_device_motion: dev={device_id}");
+
+        let (prediction_mode, sample_interpolation) = {
+            let settings = SESSION_MANAGER.read().settings().clone();
+            match &settings.headset.controllers {
+                Switch::Enabled(config) => (config.prediction_mode, config.sample_interpolation),
+                Switch::Disabled => (PredictionMode::Linear, false),
+            }
+        };
+
+        self.connection_context
+            .tracking_manager
+            .read()
+            .get_extrapolated_device_motion(
+                device_id,
+                sample_timestamp,
+                target_timestamp,
+                prediction_mode,
+                sample_interpolation,
+            )
     }
 
     pub fn get_hand_skeleton(
@@ -322,12 +355,26 @@ impl ServerCoreContext {
     pub fn get_tracker_pose_time_offset(&self) -> Duration {
         dbg_server_core!("get_tracker_pose_time_offset");
 
-        self.connection_context
+        // Read the pipeline frames from the session on every call, so the value can be changed
+        // in real time
+        let steamvr_pipeline_frames = SESSION_MANAGER
+            .read()
+            .settings()
+            .headset
+            .controllers
+            .as_option()
+            .map(|config| config.steamvr_pipeline_frames)
+            .unwrap_or(0.0);
+
+        let frame_interval = self
+            .connection_context
             .statistics_manager
             .read()
             .as_ref()
-            .map(|stats| stats.tracker_pose_time_offset())
-            .unwrap_or_default()
+            .map(|stats| stats.frame_interval())
+            .unwrap_or_default();
+
+        Duration::from_secs_f32(steamvr_pipeline_frames * frame_interval.as_secs_f32())
     }
 
     pub fn send_haptics(&self, haptics: Haptics) {

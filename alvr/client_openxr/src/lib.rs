@@ -196,26 +196,31 @@ pub fn entry_point(telemetry_base_dir: Option<PathBuf>) {
     assert!(available_exts.khr_opengl_es_enable);
 
     let mut selected_exts = xr::ExtensionSet::default();
-    selected_exts.bd_body_tracking = true;
-    selected_exts.bd_controller_interaction = true;
-    selected_exts.bd_facial_simulation = true;
-    selected_exts.ext_eye_gaze_interaction = true;
-    selected_exts.ext_hand_tracking = true;
+    #[cfg(not(feature = "lite"))]
+    {
+        // Extensions that are useless for controller based games are not requested in the lite
+        // build: the corresponding trackers are never created and the runtime skips their setup
+        selected_exts.bd_body_tracking = true;
+        selected_exts.bd_controller_interaction = true;
+        selected_exts.bd_facial_simulation = true;
+        selected_exts.ext_eye_gaze_interaction = true;
+        selected_exts.ext_hand_tracking = true;
+        selected_exts.fb_body_tracking = true;
+        selected_exts.fb_eye_tracking_social = true;
+        selected_exts.fb_face_tracking2 = true;
+        selected_exts.fb_passthrough = true;
+        selected_exts.htc_facial_tracking = true;
+        selected_exts.htc_passthrough = true;
+    }
     selected_exts.ext_local_floor = true;
     selected_exts.ext_performance_settings = true;
     selected_exts.ext_user_presence = true;
-    selected_exts.fb_body_tracking = true;
     selected_exts.fb_color_space = true;
     selected_exts.fb_composition_layer_settings = true;
     selected_exts.fb_display_refresh_rate = true;
-    selected_exts.fb_eye_tracking_social = true;
-    selected_exts.fb_face_tracking2 = true;
     selected_exts.fb_foveation = true;
     selected_exts.fb_foveation_configuration = true;
-    selected_exts.fb_passthrough = true;
     selected_exts.fb_swapchain_update_state = true;
-    selected_exts.htc_facial_tracking = true;
-    selected_exts.htc_passthrough = true;
     selected_exts.htc_vive_focus3_controller_interaction = true;
     #[cfg(target_os = "android")]
     {

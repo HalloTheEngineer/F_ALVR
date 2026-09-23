@@ -47,6 +47,7 @@ pub struct ParsedStreamConfig {
     pub buffering_history_weight: f32,
     pub decoder_options: Vec<(String, MediacodecProperty)>,
     pub interaction_sources: InteractionSourcesConfig,
+    pub input_poll_divisor: u32,
 }
 
 impl ParsedStreamConfig {
@@ -76,6 +77,13 @@ impl ParsedStreamConfig {
             buffering_history_weight: config.settings.video.buffering_history_weight,
             decoder_options: config.settings.video.mediacodec_extra_options.clone(),
             interaction_sources: InteractionSourcesConfig::new(config),
+            input_poll_divisor: config
+                .settings
+                .headset
+                .controllers
+                .as_option()
+                .map(|config| config.input_poll_divisor)
+                .unwrap_or(3),
         }
     }
 }
@@ -284,6 +292,7 @@ impl StreamContext {
             let stage_reference_space = Arc::clone(&self.stage_reference_space);
             let view_reference_space = Arc::clone(&self.view_reference_space);
             let refresh_rate = self.config.refresh_rate_hint;
+            let input_poll_divisor = self.config.input_poll_divisor;
             let running = Arc::clone(&self.input_thread_running);
             move || {
                 stream_input_loop(
@@ -293,6 +302,7 @@ impl StreamContext {
                     &stage_reference_space,
                     &view_reference_space,
                     refresh_rate,
+                    input_poll_divisor,
                     running,
                 )
             }
@@ -533,6 +543,7 @@ fn stream_input_loop(
     stage_reference_space: &xr::Space,
     view_reference_space: &xr::Space,
     refresh_rate: f32,
+    input_poll_divisor: u32,
     running: Arc<RelaxedAtomic>,
 ) {
     let mut last_controller_poses = [Pose::IDENTITY; 2];
@@ -761,7 +772,7 @@ fn stream_input_loop(
             core_ctx.send_buttons(button_entries);
         }
 
-        deadline += frame_interval / 3;
+        deadline += frame_interval / input_poll_divisor;
         thread::sleep(deadline.saturating_duration_since(Instant::now()));
     }
 }

@@ -314,10 +314,12 @@ fn spawn_event_loop(events_receiver: mpsc::Receiver<ServerCoreEvent>) {
                         let (ffi_left_controller_motion, ffi_right_controller_motion) =
                             if tracked && let Some(config) = &controllers_config {
                                 let ffi_left_controller_motion = context
-                                    .get_device_motion(*HAND_LEFT_ID, poll_timestamp)
+                                    .get_extrapolated_device_motion(
+                                        *HAND_LEFT_ID,
+                                        poll_timestamp,
+                                        target_controller_timestamp,
+                                    )
                                     .map(|motion| {
-                                        let motion = motion
-                                            .predict(poll_timestamp, target_controller_timestamp);
                                         let motion = tracking::offset_controller_motion(
                                             config,
                                             *HAND_LEFT_ID,
@@ -326,10 +328,12 @@ fn spawn_event_loop(events_receiver: mpsc::Receiver<ServerCoreEvent>) {
                                         tracking::to_ffi_motion(*HAND_LEFT_ID, motion)
                                     });
                                 let ffi_right_controller_motion = context
-                                    .get_device_motion(*HAND_RIGHT_ID, poll_timestamp)
+                                    .get_extrapolated_device_motion(
+                                        *HAND_RIGHT_ID,
+                                        poll_timestamp,
+                                        target_controller_timestamp,
+                                    )
                                     .map(|motion| {
-                                        let motion = motion
-                                            .predict(poll_timestamp, target_controller_timestamp);
                                         let motion = tracking::offset_controller_motion(
                                             config,
                                             *HAND_RIGHT_ID,

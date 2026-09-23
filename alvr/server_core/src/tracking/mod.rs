@@ -20,7 +20,7 @@ use alvr_common::{
 use alvr_events::{EventType, TrackingEvent};
 use alvr_packets::TrackingData;
 use alvr_session::{
-    BodyTrackingConfig, HeadsetConfig, RecenteringMode, Settings, VMCConfig,
+    BodyTrackingConfig, HeadsetConfig, PredictionMode, RecenteringMode, Settings, VMCConfig,
     settings_schema::Switch,
 };
 use alvr_sockets::StreamReceiver;
@@ -190,39 +190,113 @@ impl TrackingManager {
 
     // If the exact sample_timestamp is not found, use the closest one if it's not older. This makes
     // sure that we return None if there is no newer sample and always return Some otherwise.
+    // When sample_interpolation is enabled and an older sample also exists, the motion is
+    // interpolated between the two.
     pub fn get_device_motion(
         &self,
         device_id: u64,
         sample_timestamp: Duration,
+        sample_interpolation: bool,
     ) -> Option<DeviceMotion> {
-        self.device_motions_history
-            .get(&device_id)
-            .and_then(|motions| {
-                // Get first element to initialize a valid motion reference
-                if let Some((_, motion)) = motions.front() {
-                    let mut best_timestamp_diff = Duration::MAX;
-                    let mut best_motion_ref = motion;
+        let motions = self.device_motions_history.get(&device_id)?;
 
-                    // Note: we are iterating from most recent to oldest
-                    for (ts, m) in motions {
-                        match ts.cmp(&sample_timestamp) {
-                            Ordering::Equal => return Some(*m),
-                            Ordering::Greater => {
-                                let diff = ts.saturating_sub(sample_timestamp);
-                                if diff < best_timestamp_diff {
-                                    best_timestamp_diff = diff;
-                                    best_motion_ref = m;
-                                }
-                            }
-                            Ordering::Less => continue,
-                        }
-                    }
+        // Note: we are iterating from most recent to oldest
+        let mut closest_newer: Option<(&Duration, &DeviceMotion)> = None;
+        let mut closest_older: Option<(&Duration, &DeviceMotion)> = None;
 
-                    (best_timestamp_diff != Duration::MAX).then_some(*best_motion_ref)
-                } else {
-                    None
+        for (ts, motion) in motions {
+            if closest_newer.is_none() {
+                match ts.cmp(&sample_timestamp) {
+                    Ordering::Equal => return Some(*motion),
+                    Ordering::Greater => closest_newer = Some((ts, motion)),
+                    // No newer sample exists: cannot return anything
+                    Ordering::Less => return None,
                 }
-            })
+            } else {
+                closest_older = Some((ts, motion));
+                break;
+            }
+        }
+
+        let Some((newer_ts, newer_motion)) = closest_newer else {
+            return None;
+        };
+
+        if sample_interpolation
+            && let Some((older_ts, older_motion)) = closest_older
+        {
+            return Some(interpolate_motion(
+                older_motion,
+                newer_motion,
+                *older_ts,
+                *newer_ts,
+                sample_timestamp,
+            ));
+        }
+
+        Some(*newer_motion)
+    }
+
+    // Predicts the motion of device_id from sample_timestamp to target_timestamp, using the
+    // prediction mode in prediction_mode. The Quadratic mode takes the angular and linear
+    // acceleration into account, estimated from the two closest samples.
+    pub fn get_extrapolated_device_motion(
+        &self,
+        device_id: u64,
+        sample_timestamp: Duration,
+        target_timestamp: Duration,
+        prediction_mode: PredictionMode,
+        sample_interpolation: bool,
+    ) -> Option<DeviceMotion> {
+        let motion =
+            self.get_device_motion(device_id, sample_timestamp, sample_interpolation)?;
+
+        match prediction_mode {
+            PredictionMode::Linear => Some(motion.predict(sample_timestamp, target_timestamp)),
+            PredictionMode::Quadratic => {
+                // Closest sample older than sample_timestamp, to estimate the acceleration. If it
+                // does not exist, fall back to linear prediction.
+                let motions = self.device_motions_history.get(&device_id)?;
+                let Some((prev_timestamp, prev_motion)) =
+                    motions.iter().find(|(ts, _)| *ts < sample_timestamp)
+                else {
+                    return Some(motion.predict(sample_timestamp, target_timestamp));
+                };
+
+                let dt = sample_timestamp.saturating_sub(*prev_timestamp).as_secs_f32();
+                if dt <= 0.0 {
+                    return Some(motion.predict(sample_timestamp, target_timestamp));
+                }
+
+                const MAX_ANGULAR_ACCEL: f32 = 200.0; // rad/s²
+                const MAX_LINEAR_ACCEL: f32 = 200.0; // m/s²
+                let accel_limit = Vec3::splat(MAX_ANGULAR_ACCEL);
+                let angular_accel = ((motion.angular_velocity - prev_motion.angular_velocity) / dt)
+                    .clamp(-accel_limit, accel_limit);
+                let linear_accel = ((motion.linear_velocity - prev_motion.linear_velocity) / dt)
+                    .clamp(-accel_limit, accel_limit);
+
+                let delta_time_s = target_timestamp
+                    .saturating_sub(sample_timestamp)
+                    .as_secs_f32();
+                let half_delta_squared = 0.5 * delta_time_s * delta_time_s;
+                let delta_orientation = Quat::from_scaled_axis(
+                    motion.angular_velocity * delta_time_s
+                        + angular_accel * half_delta_squared,
+                );
+
+                Some(DeviceMotion {
+                    pose: Pose {
+                        orientation: delta_orientation * motion.pose.orientation,
+                        position: motion.pose.position
+                            + motion.linear_velocity * delta_time_s
+                            + linear_accel * half_delta_squared,
+                    },
+                    linear_velocity: motion.linear_velocity + linear_accel * delta_time_s,
+                    angular_velocity: motion.angular_velocity + angular_accel * delta_time_s,
+                })
+            }
+        }
     }
 
     pub fn report_hand_skeleton(
@@ -259,6 +333,37 @@ impl TrackingManager {
         for params in view_params {
             params.pose = self.inverse_recentering_origin.inverse() * params.pose;
         }
+    }
+}
+
+fn interpolate_motion(
+    older_motion: &DeviceMotion,
+    newer_motion: &DeviceMotion,
+    older_timestamp: Duration,
+    newer_timestamp: Duration,
+    timestamp: Duration,
+) -> DeviceMotion {
+    let total_s = newer_timestamp.saturating_sub(older_timestamp).as_secs_f32();
+    if total_s <= 0.0 {
+        return *newer_motion;
+    }
+
+    let alpha = (timestamp.saturating_sub(older_timestamp).as_secs_f32() / total_s).clamp(0.0, 1.0);
+
+    DeviceMotion {
+        pose: Pose {
+            position: older_motion.pose.position.lerp(newer_motion.pose.position, alpha),
+            orientation: older_motion
+                .pose
+                .orientation
+                .slerp(newer_motion.pose.orientation, alpha),
+        },
+        linear_velocity: older_motion
+            .linear_velocity
+            .lerp(newer_motion.linear_velocity, alpha),
+        angular_velocity: older_motion
+            .angular_velocity
+            .lerp(newer_motion.angular_velocity, alpha),
     }
 }
 
@@ -411,7 +516,7 @@ pub fn tracking_loop(
                         Some((
                             (*DEVICE_ID_TO_PATH.get(id)?).into(),
                             tracking_manager_lock
-                                .get_device_motion(*id, timestamp)
+                                .get_device_motion(*id, timestamp, false)
                                 .unwrap(),
                         ))
                     })
@@ -497,7 +602,7 @@ pub fn tracking_loop(
                         (
                             *id,
                             tracking_manager_lock
-                                .get_device_motion(*id, timestamp)
+                                .get_device_motion(*id, timestamp, false)
                                 .unwrap(),
                         )
                     })
@@ -524,9 +629,9 @@ pub fn tracking_loop(
                 .map(move |id| {
                     (
                         *id,
-                        tracking_manager_lock
-                            .get_device_motion(*id, timestamp)
-                            .unwrap(),
+                            tracking_manager_lock
+                                .get_device_motion(*id, timestamp, false)
+                                .unwrap(),
                     )
                 })
                 .collect::<Vec<_>>();
