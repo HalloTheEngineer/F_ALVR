@@ -1,7 +1,7 @@
 #![allow(clippy::if_same_then_else)]
 
 use crate::{
-    ClientCapabilities, ClientCoreEvent, VideoFrameMetadata,
+    ClientCapabilities, ClientCoreEvent, ClientTelemetry, VideoFrameMetadata,
     logging_backend::{LOG_CHANNEL_SENDER, LogMirrorData},
     sockets::AnnouncerSocket,
     statistics::StatisticsManager,
@@ -67,6 +67,7 @@ pub struct ConnectionContext {
     pub decoder_callback: Mutex<Option<Box<DecoderCallback>>>,
     pub video_frame_metadata_queue: Mutex<VecDeque<(Duration, VideoFrameMetadata)>>,
     pub max_prediction: RwLock<Duration>,
+    pub telemetry: ClientTelemetry,
 }
 
 fn set_hud_message(event_queue: &Mutex<VecDeque<ClientCoreEvent>>, message: &str) {
@@ -236,6 +237,16 @@ fn connection_pipeline(
     } else {
         settings.connection.stream_protocol
     };
+
+    ctx.telemetry.start(
+        &settings,
+        negotiated_config.refresh_rate_hint,
+        [
+            negotiated_config.view_resolution.x,
+            negotiated_config.view_resolution.y,
+        ],
+        negotiated_config.wired,
+    );
 
     dbg_connection!("connection_pipeline: create StreamSocket");
     let stream_socket_builder = StreamSocketBuilder::listen_for_server(
@@ -555,6 +566,7 @@ fn connection_pipeline(
             debug_groups_config: settings.extra.logging.debug_groups,
         });
     }
+
     event_queue.lock().push_back(streaming_start_event);
 
     *connection_state_lock = ConnectionState::Streaming;
@@ -570,6 +582,8 @@ fn connection_pipeline(
     *ctx.tracking_sender.lock() = None;
     *ctx.statistics_sender.lock() = None;
     *LOG_CHANNEL_SENDER.lock() = None;
+
+    ctx.telemetry.stop();
 
     event_queue
         .lock()

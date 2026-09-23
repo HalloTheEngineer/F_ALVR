@@ -9,14 +9,15 @@ use crate::{
 };
 use alvr_adb::{WiredConnection, WiredConnectionStatus};
 use alvr_common::{
-    AlvrFoveatedEncodingParams, AnyhowToCon, BUTTON_INFO, CONTROLLER_PROFILE_INFO, ConResult,
-    ConnectionError, ConnectionState, LifecycleState, QUEST_CONTROLLER_PROFILE_PATH, con_bail,
+    ALVR_VERSION, AlvrFoveatedEncodingParams, AnyhowToCon, BUTTON_INFO, CONTROLLER_PROFILE_INFO,
+    ConResult, ConnectionError, ConnectionState, LifecycleState, QUEST_CONTROLLER_PROFILE_PATH,
+    TelemetryLogger, con_bail,
     dbg_connection, debug, error,
     glam::{UVec2, Vec2},
     info,
     parking_lot::{Condvar, Mutex, RwLock},
     settings_schema::Switch,
-    warn,
+    unix_timestamp_ms, warn,
 };
 use alvr_events::{AdbEvent, ButtonEvent, EventType};
 use alvr_packets::{
@@ -26,8 +27,8 @@ use alvr_packets::{
     VIDEO, VideoPacketHeader,
 };
 use alvr_session::{
-    BodyTrackingSinkConfig, CodecType, ControllersEmulationMode, FrameSize, H264Profile, Settings,
-    SocketProtocol, SteamvrHmdInitConfig,
+    BitrateMode, BodyTrackingSinkConfig, CodecType, ControllersEmulationMode, FrameSize,
+    H264Profile, Settings, SocketProtocol, SteamvrHmdInitConfig,
 };
 use alvr_sockets::{
     CONTROL_PORT, KEEPALIVE_INTERVAL, KEEPALIVE_TIMEOUT, ProtoControlSocket, SocketConnection,
@@ -42,6 +43,7 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+use serde_json::json;
 
 const RETRY_CONNECT_MIN_INTERVAL: Duration = Duration::from_secs(1);
 const HANDSHAKE_ACTION_TIMEOUT: Duration = Duration::from_secs(2);
@@ -65,6 +67,53 @@ fn is_streaming(client_hostname: &str) -> bool {
         .client_list()
         .get(client_hostname)
         .is_some_and(|c| c.connection_state == ConnectionState::Streaming)
+}
+
+fn telemetry_bitrate_mode_string(mode: &BitrateMode) -> String {
+    match mode {
+        BitrateMode::ConstantMbps(mbps) => format!("constant_{mbps}"),
+        BitrateMode::Adaptive { .. } => "adaptive".into(),
+    }
+}
+
+fn telemetry_stream_protocol_string(protocol: &SocketProtocol) -> String {
+    match protocol {
+        SocketProtocol::Udp => "udp".into(),
+        SocketProtocol::Tcp => "tcp".into(),
+    }
+}
+
+fn create_telemetry_logger(
+    settings: &Settings,
+    fps: f32,
+    codec: CodecType,
+    eye_resolution: UVec2,
+) -> Option<Arc<TelemetryLogger>> {
+    let base_dir = FILESYSTEM_LAYOUT.get()?.log_dir.join("alvr_telemetry");
+    let session_dir = TelemetryLogger::create_session_dir(&base_dir)?;
+
+    let header = json!({
+        "type": "header",
+        "role": "server",
+        "version": ALVR_VERSION.to_string(),
+        "unix_ms": unix_timestamp_ms(),
+        "settings": {
+            "codec": format!("{codec:?}"),
+            "fps": fps,
+            "stream_protocol": telemetry_stream_protocol_string(&settings.connection.stream_protocol),
+            "bitrate_mode": telemetry_bitrate_mode_string(&settings.video.bitrate.mode),
+            "max_prediction_ms": settings.headset.max_prediction_ms,
+            "steamvr_pipeline_frames": settings
+                .headset
+                .controllers
+                .as_option()
+                .map(|config| config.steamvr_pipeline_frames),
+            "eye_resolution": [eye_resolution.x, eye_resolution.y],
+        },
+    })
+    .to_string();
+
+    TelemetryLogger::start(&session_dir, "server", &header)
 }
 
 // Compute a hash over all steamvr-restart settings and client-negotiated values.
@@ -1137,9 +1186,29 @@ fn connection_pipeline(
                 };
 
                 if let Some(stats) = &mut *ctx.statistics_manager.write() {
+                    let stats_row = client_stats.clone();
                     let timestamp = client_stats.target_timestamp;
                     let decoder_latency = client_stats.video_decode;
                     let (network_latency, game_latency) = stats.report_statistics(client_stats);
+
+                    if let Some(logger) = &*ctx.telemetry_logger.lock() {
+                        logger.log(
+                            json!({
+                                "type": "client_stats",
+                                "unix_ms": unix_timestamp_ms(),
+                                "target_ts_us": timestamp.as_micros(),
+                                "network_latency_us": network_latency.as_micros(),
+                                "game_latency_us": game_latency.as_micros(),
+                                "frame_interval_us": stats_row.frame_interval.as_micros(),
+                                "video_decode_us": stats_row.video_decode.as_micros(),
+                                "video_decoder_queue_us": stats_row.video_decoder_queue.as_micros(),
+                                "rendering_us": stats_row.rendering.as_micros(),
+                                "vsync_queue_us": stats_row.vsync_queue.as_micros(),
+                                "total_pipeline_latency_us": stats_row.total_pipeline_latency.as_micros(),
+                            })
+                            .to_string(),
+                        );
+                    }
 
                     ctx.events_sender
                         .send(ServerCoreEvent::GameRenderLatencyFeedback(game_latency))
@@ -1438,6 +1507,14 @@ fn connection_pipeline(
         ClientConnectionsAction::SetConnectionState(ConnectionState::Streaming),
     );
 
+    if let Some(logger) =
+        create_telemetry_logger(&initial_settings, fps, codec, transcoding_view_resolution)
+    {
+        *ctx.telemetry_logger.lock() = Some(Arc::clone(&logger));
+    } else {
+        warn!("Failed to create telemetry logger");
+    }
+
     ctx.events_sender
         .send(ServerCoreEvent::ClientConnected(
             ServerNegotiatedStreamingConfig {
@@ -1463,6 +1540,10 @@ fn connection_pipeline(
     *ctx.haptics_sender.lock() = None;
 
     *ctx.video_recording_file.lock() = None;
+
+    if let Some(logger) = ctx.telemetry_logger.lock().take() {
+        logger.stop();
+    }
 
     session_manager_lock.update_client_connections(
         client_hostname,

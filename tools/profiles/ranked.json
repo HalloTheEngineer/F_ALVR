@@ -1,0 +1,248 @@
+{
+    "name": "ranked",
+    "description": "Beat Saber ranked profile: 120Hz, H264, constant 300 Mbps, minimal latency, tracking extras off",
+    "values": [
+        {
+            "path": [
+                "session_settings",
+                "video",
+                "preferred_fps"
+            ],
+            "value": 120.0
+        },
+        {
+            "path": [
+                "session_settings",
+                "video",
+                "preferred_codec",
+                "variant"
+            ],
+            "value": "H264"
+        },
+        {
+            "path": [
+                "session_settings",
+                "video",
+                "max_buffering_frames"
+            ],
+            "value": 1.0
+        },
+        {
+            "path": [
+                "session_settings",
+                "video",
+                "foveated_encoding",
+                "enabled"
+            ],
+            "value": false
+        },
+        {
+            "path": [
+                "session_settings",
+                "video",
+                "bitrate",
+                "mode"
+            ],
+            "value": {
+                "ConstantMbps": 300,
+                "Adaptive": {
+                    "gui_collapsed": true,
+                    "saturation_multiplier": 0.95,
+                    "max_throughput_mbps": {
+                        "enabled": false,
+                        "content": 100
+                    },
+                    "min_throughput_mbps": {
+                        "enabled": false,
+                        "content": 5
+                    },
+                    "max_network_latency_ms": {
+                        "enabled": false,
+                        "content": 8
+                    },
+                    "encoder_latency_limiter": {
+                        "enabled": true,
+                        "content": {
+                            "max_saturation_multiplier": 0.9
+                        }
+                    },
+                    "decoder_latency_limiter": {
+                        "enabled": true,
+                        "content": {
+                            "gui_collapsed": false,
+                            "max_decoder_latency_ms": 30,
+                            "latency_overstep_frames": 90,
+                            "latency_overstep_multiplier": 0.99
+                        }
+                    }
+                },
+                "variant": "ConstantMbps"
+            }
+        },
+        {
+            "path": [
+                "session_settings",
+                "connection",
+                "dscp",
+                "set"
+            ],
+            "value": true
+        },
+        {
+            "path": [
+                "session_settings",
+                "connection",
+                "avoid_video_glitching"
+            ],
+            "value": false
+        },
+        {
+            "path": [
+                "session_settings",
+                "connection",
+                "packet_size"
+            ],
+            "value": 1400
+        },
+        {
+            "path": [
+                "session_settings",
+                "connection",
+                "minimum_idr_interval_ms"
+            ],
+            "value": 100
+        },
+        {
+            "path": [
+                "session_settings",
+                "connection",
+                "server_buffer_config",
+                "send_size_bytes",
+                "variant"
+            ],
+            "value": "Maximum"
+        },
+        {
+            "path": [
+                "session_settings",
+                "connection",
+                "server_buffer_config",
+                "recv_size_bytes",
+                "variant"
+            ],
+            "value": "Maximum"
+        },
+        {
+            "path": [
+                "session_settings",
+                "connection",
+                "client_buffer_config",
+                "send_size_bytes",
+                "variant"
+            ],
+            "value": "Maximum"
+        },
+        {
+            "path": [
+                "session_settings",
+                "connection",
+                "client_buffer_config",
+                "recv_size_bytes",
+                "variant"
+            ],
+            "value": "Maximum"
+        },
+        {
+            "path": [
+                "session_settings",
+                "headset",
+                "performance_level",
+                "cpu",
+                "enabled"
+            ],
+            "value": true
+        },
+        {
+            "path": [
+                "session_settings",
+                "headset",
+                "performance_level",
+                "cpu",
+                "content",
+                "variant"
+            ],
+            "value": "SustainedHigh"
+        },
+        {
+            "path": [
+                "session_settings",
+                "headset",
+                "performance_level",
+                "gpu",
+                "enabled"
+            ],
+            "value": true
+        },
+        {
+            "path": [
+                "session_settings",
+                "headset",
+                "performance_level",
+                "gpu",
+                "content",
+                "variant"
+            ],
+            "value": "SustainedHigh"
+        },
+        {
+            "path": [
+                "session_settings",
+                "headset",
+                "max_prediction_ms"
+            ],
+            "value": 60
+        },
+        {
+            "path": [
+                "session_settings",
+                "headset",
+                "controllers",
+                "content",
+                "steamvr_pipeline_frames"
+            ],
+            "value": 2.0
+        },
+        {
+            "path": [
+                "session_settings",
+                "headset",
+                "controllers",
+                "content",
+                "hand_skeleton",
+                "enabled"
+            ],
+            "value": false
+        },
+        {
+            "path": [
+                "session_settings",
+                "audio",
+                "microphone",
+                "enabled"
+            ],
+            "value": false
+        },
+        {
+            "path": [
+                "session_settings",
+                "audio",
+                "game_audio",
+                "content",
+                "buffering",
+                "average_buffering_ms"
+            ],
+            "value": 40
+        }
+    ],
+    "steamvr_restart": true
+}

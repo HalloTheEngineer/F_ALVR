@@ -17,7 +17,7 @@ pub use tracking::HandType;
 use crate::connection::VideoPacket;
 use alvr_common::{
     AlvrFoveatedEncodingParams, ConnectionState, DEVICE_ID_TO_PATH, DeviceMotion, LifecycleState,
-    Pose, ViewParams, dbg_server_core, error,
+    Pose, TelemetryLogger, ViewParams, dbg_server_core, error, unix_timestamp_ms,
     glam::{UVec2, Vec2},
     parking_lot::{Mutex, RwLock},
     settings_schema::Switch,
@@ -33,6 +33,7 @@ use alvr_server_io::ServerSessionManager;
 use alvr_session::{CodecType, H264Profile, OpenvrProperty, Settings, SteamvrHmdInitConfig};
 use alvr_sockets::StreamSender;
 use bitrate::{BitrateManager, DynamicEncoderParams};
+use serde_json::json;
 use statistics::StatisticsManager;
 use std::{
     collections::HashSet,
@@ -112,6 +113,7 @@ pub struct ConnectionContext {
     decoder_config: Mutex<Option<DecoderInitializationConfig>>,
     video_mirror_sender: Mutex<Option<broadcast::Sender<Vec<u8>>>>,
     video_recording_file: Mutex<Option<File>>,
+    telemetry_logger: Mutex<Option<Arc<TelemetryLogger>>>,
     connection_threads: Mutex<Vec<JoinHandle<()>>>,
     clients_to_be_removed: Mutex<HashSet<String>>,
     video_channel_sender: Mutex<Option<SyncSender<VideoPacket>>>,
@@ -230,6 +232,7 @@ impl ServerCoreContext {
             decoder_config: Mutex::new(None),
             video_mirror_sender: Mutex::new(None),
             video_recording_file: Mutex::new(None),
+            telemetry_logger: Mutex::new(None),
             connection_threads: Mutex::new(Vec::new()),
             clients_to_be_removed: Mutex::new(HashSet::new()),
             video_channel_sender: Mutex::new(None),
@@ -469,6 +472,20 @@ impl ServerCoreContext {
                     .bitrate_manager
                     .lock()
                     .report_frame_encoded(timestamp, encoder_latency, buffer_size);
+
+                if let Some(logger) = &*self.connection_context.telemetry_logger.lock() {
+                    logger.log(
+                        json!({
+                            "type": "frame_encoded",
+                            "unix_ms": unix_timestamp_ms(),
+                            "target_ts_us": timestamp.as_micros(),
+                            "encoder_latency_us": encoder_latency.as_micros(),
+                            "buffer_size": buffer_size,
+                            "is_idr": is_idr,
+                        })
+                        .to_string(),
+                    );
+                }
             }
         }
     }

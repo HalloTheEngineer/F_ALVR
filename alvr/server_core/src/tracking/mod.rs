@@ -13,7 +13,7 @@ use crate::{
     input_mapping::ButtonMappingManager,
 };
 use alvr_common::{
-    ConnectionError, DEVICE_ID_TO_PATH, DeviceMotion, Pose, ViewParams,
+    ConnectionError, DEVICE_ID_TO_PATH, DeviceMotion, Pose, ViewParams, unix_timestamp_ms,
     glam::{Quat, Vec3},
     inputs as inp,
 };
@@ -24,11 +24,12 @@ use alvr_session::{
     settings_schema::Switch,
 };
 use alvr_sockets::StreamReceiver;
+use serde_json::json;
 use std::{
     cmp::Ordering,
     collections::{HashMap, VecDeque},
     f32::consts::PI,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 const DEG_TO_RAD: f32 = PI / 180.0;
@@ -304,6 +305,9 @@ pub fn tracking_loop(
         .into_option()
         .and_then(|config| VMCSink::new(config).ok());
 
+    let mut last_recv_instant: Option<Instant> = None;
+    let mut last_poll_timestamp: Option<Duration> = None;
+
     while is_streaming() {
         let data = match tracking_receiver.recv(STREAMING_RECV_TIMEOUT) {
             Ok(tracking) => tracking,
@@ -315,6 +319,27 @@ pub fn tracking_loop(
         };
 
         let timestamp = tracking.poll_timestamp;
+
+        if let Some(logger) = &*ctx.telemetry_logger.lock() {
+            let recv_instant = Instant::now();
+            let interarrival_us = last_recv_instant
+                .map(|prev| recv_instant.saturating_duration_since(prev).as_micros());
+            let poll_delta_us = last_poll_timestamp
+                .map(|prev| timestamp.saturating_sub(prev).as_micros());
+            last_recv_instant = Some(recv_instant);
+            last_poll_timestamp = Some(timestamp);
+
+            logger.log(
+                json!({
+                    "type": "tracking_received",
+                    "unix_ms": unix_timestamp_ms(),
+                    "poll_ts_us": timestamp.as_micros(),
+                    "interarrival_us": interarrival_us,
+                    "poll_delta_us": poll_delta_us,
+                })
+                .to_string(),
+            );
+        }
 
         if let Some(stats) = &mut *ctx.statistics_manager.write() {
             stats.report_tracking_received(timestamp);

@@ -11,6 +11,9 @@ mod logging_backend;
 mod sockets;
 mod statistics;
 mod storage;
+mod telemetry;
+
+pub use telemetry::{ClientTelemetry, TelemetrySample, pose_residual};
 
 #[cfg(target_os = "android")]
 mod audio;
@@ -31,6 +34,7 @@ use alvr_system_info::Platform;
 use connection::{ConnectionContext, DecoderCallback};
 use std::{
     collections::{HashSet, VecDeque},
+    path::PathBuf,
     sync::Arc,
     thread::{self, JoinHandle},
     time::Duration,
@@ -89,7 +93,7 @@ pub struct ClientCoreContext {
 }
 
 impl ClientCoreContext {
-    pub fn new(capabilities: ClientCapabilities) -> Self {
+    pub fn new(capabilities: ClientCapabilities, telemetry_base_dir: Option<PathBuf>) -> Self {
         dbg_client_core!("Create");
 
         // Make sure to reset config in case of version compat mismatch.
@@ -109,7 +113,10 @@ impl ClientCoreContext {
 
         let lifecycle_state = Arc::new(RwLock::new(LifecycleState::Idle));
         let event_queue = Arc::new(Mutex::new(VecDeque::new()));
-        let connection_context = Arc::new(ConnectionContext::default());
+        let connection_context = Arc::new(ConnectionContext {
+            telemetry: ClientTelemetry::new(telemetry_base_dir),
+            ..ConnectionContext::default()
+        });
         let connection_thread = thread::spawn({
             let lifecycle_state = Arc::clone(&lifecycle_state);
             let connection_context = Arc::clone(&connection_context);
@@ -308,11 +315,25 @@ impl ClientCoreContext {
             if let Some(sender) = &mut *self.connection_context.statistics_sender.lock() {
                 if let Some(stats) = stats.summary(timestamp) {
                     sender.send_header(&stats).ok();
+
+                    self.connection_context.telemetry.log_frame(&stats);
                 } else {
                     warn!("Statistics summary not ready!");
                 }
             }
         }
+    }
+
+    pub fn log_input_sample(
+        &self,
+        poll_timestamp: Duration,
+        now_timestamp: Duration,
+        head: TelemetrySample,
+        hands: [Option<(u64, TelemetrySample)>; 2],
+    ) {
+        self.connection_context
+            .telemetry
+            .log_input_sample(poll_timestamp, now_timestamp, &head, hands);
     }
 
     pub fn platform(&self) -> Platform {

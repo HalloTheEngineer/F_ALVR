@@ -4,6 +4,7 @@ mod connection_result;
 pub mod inputs;
 mod logging;
 mod primitives;
+mod telemetry;
 mod version;
 
 use parking_lot::{Condvar, Mutex, RwLockWriteGuard};
@@ -24,6 +25,7 @@ pub use inputs::*;
 pub use log::{debug, error, info, warn};
 pub use logging::*;
 pub use primitives::*;
+pub use telemetry::*;
 pub use version::*;
 
 pub const ALVR_NAME: &str = "ALVR";

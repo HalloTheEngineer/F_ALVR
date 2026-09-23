@@ -25,7 +25,7 @@ use interaction::{InteractionContext, InteractionSourcesConfig};
 use lobby::Lobby;
 use openxr as xr;
 use passthrough::PassthroughLayer;
-use std::{ffi::CStr, path::Path, rc::Rc, sync::Arc, thread, time::Duration};
+use std::{ffi::CStr, path::Path, path::PathBuf, rc::Rc, sync::Arc, thread, time::Duration};
 use stream::StreamContext;
 
 fn from_xr_vec3(v: xr::Vector3f) -> Vec3 {
@@ -157,7 +157,7 @@ fn create_session(
     }
 }
 
-pub fn entry_point() {
+pub fn entry_point(telemetry_base_dir: Option<PathBuf>) {
     alvr_client_core::init_logging();
 
     const LEGACY_OPENXR_VERSION: xr::Version = xr::Version::new(1, 0, 34);
@@ -340,7 +340,8 @@ pub fn entry_point() {
             preferred_encoding_gamma: 1.0,
             prefer_hdr: false,
         };
-        let core_context = Arc::new(ClientCoreContext::new(capabilities));
+        let core_context =
+            Arc::new(ClientCoreContext::new(capabilities, telemetry_base_dir.clone()));
 
         let interaction_context = Arc::new(RwLock::new(InteractionContext::new(
             xr_session.clone(),
@@ -632,12 +633,17 @@ fn xr_runtime_now(xr_instance: &xr::Instance) -> Option<xr::Time> {
 fn android_main(app: android_activity::AndroidApp) {
     use android_activity::{InputStatus, MainEvent, PollEvent};
 
-    let rendering_thread = thread::spawn(|| {
+    let app_for_thread = app.clone();
+    let rendering_thread = thread::spawn(move || {
         // workaround for the Pico runtime
         let context = ndk_context::android_context();
         let vm = unsafe { jni::JavaVM::from_raw(context.vm().cast()) };
         vm.attach_current_thread(|_env| {
-            entry_point();
+            let telemetry_base_dir = app_for_thread
+                .external_data_path()
+                .map(|path| path.join("alvr_telemetry"));
+
+            entry_point(telemetry_base_dir);
 
             jni::errors::Result::Ok(())
         })

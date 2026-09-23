@@ -3,12 +3,12 @@ use crate::{
     interaction::{self, InteractionContext, InteractionSourcesConfig},
 };
 use alvr_client_core::{
-    ClientCoreContext, VideoFrameMetadata,
+    ClientCoreContext, TelemetrySample, VideoFrameMetadata,
     video_decoder::{self, VideoDecoderConfig, VideoDecoderSource},
 };
 use alvr_common::{
     AlvrFoveatedEncodingParams, DETACHED_CONTROLLER_LEFT_ID, DETACHED_CONTROLLER_RIGHT_ID,
-    HAND_LEFT_ID, HAND_RIGHT_ID, HEAD_ID, Pose, RelaxedAtomic, ViewParams,
+    DeviceMotion, HAND_LEFT_ID, HAND_RIGHT_ID, HEAD_ID, Pose, RelaxedAtomic, ViewParams,
     anyhow::Result,
     error,
     glam::{UVec2, Vec2},
@@ -539,6 +539,12 @@ fn stream_input_loop(
     let mut last_palm_poses = [Pose::IDENTITY; 2];
     let mut last_view_params = [ViewParams::DUMMY; 2];
 
+    // Telemetry: pose of the last input poll, used to measure how much the OpenXR runtime
+    // revises its pose estimation for the same timestamp (tracking noise / wobble metric)
+    let mut last_sample_time: Option<Duration> = None;
+    let mut last_head_motion: Option<DeviceMotion> = None;
+    let mut last_hand_motions: [Option<(Pose, Pose)>; 2] = [None, None];
+
     let mut deadline = Instant::now();
     let frame_interval = Duration::from_secs_f32(1.0 / refresh_rate);
     while running.value() {
@@ -578,6 +584,7 @@ fn stream_input_loop(
 
         let mut device_motions = Vec::with_capacity(3);
 
+        let head_motion_for_telemetry = head_motion;
         device_motions.push((*HEAD_ID, head_motion));
 
         let left_hand_data = crate::interaction::get_hand_data(
@@ -641,7 +648,96 @@ fn stream_input_loop(
             device_motions.append(&mut interaction::get_bd_motion_trackers(source, now));
         }
 
+        // Telemetry: measure how much the runtime revises the pose of the previous poll, by
+        // relocating the controller and head spaces at the previous timestamp
+        let mut head_residual: Option<(f32, f32)> = None;
+        let mut hand_residuals: [Option<(f32, f32)>; 2] = [None, None];
+        if let Some(last_time) = last_sample_time {
+            let xr_last_time = crate::to_xr_time(last_time);
+
+            let valid_flags = xr::SpaceLocationFlags::POSITION_VALID
+                | xr::SpaceLocationFlags::ORIENTATION_VALID;
+
+            if let Some(last_motion) = &last_head_motion
+                && let Ok(relocated) =
+                    view_reference_space.locate(stage_reference_space, xr_last_time)
+                && relocated.location_flags.contains(valid_flags)
+            {
+                let (res_pos, res_ori) = alvr_client_core::pose_residual(
+                    &last_motion.pose,
+                    &crate::from_xr_pose(relocated.pose),
+                );
+                head_residual = Some((res_pos, res_ori));
+            }
+
+            for (hand_idx, hand_source) in int_ctx.hands_interaction.iter().enumerate() {
+                if let Some((last_raw_pose, _)) = &last_hand_motions[hand_idx]
+                    && let Ok(relocated) =
+                        hand_source.grip_space.locate(stage_reference_space, xr_last_time)
+                    && relocated.location_flags.contains(valid_flags)
+                {
+                    let (res_pos, res_ori) = alvr_client_core::pose_residual(
+                        last_raw_pose,
+                        &crate::from_xr_pose(relocated.pose),
+                    );
+                    hand_residuals[hand_idx] = Some((res_pos, res_ori));
+                }
+            }
+        }
+
+        let head_sample = TelemetrySample {
+            motion: head_motion_for_telemetry,
+            residual_position_m: head_residual.map(|residual| residual.0),
+            residual_orientation_deg: head_residual.map(|residual| residual.1),
+        };
+
+        let hand_offsets = [
+            int_ctx.hands_interaction[0].pose_offset,
+            int_ctx.hands_interaction[1].pose_offset,
+        ];
+        let hand_telemetry_motions = [
+            left_hand_data.grip_motion.as_ref(),
+            right_hand_data.grip_motion.as_ref(),
+        ];
+
+        let hand_samples = [
+            hand_telemetry_motions[0]
+                .zip(hand_residuals[0])
+                .map(|(motion, residual)| TelemetrySample {
+                    motion: *motion,
+                    residual_position_m: Some(residual.0),
+                    residual_orientation_deg: Some(residual.1),
+                }),
+            hand_telemetry_motions[1]
+                .zip(hand_residuals[1])
+                .map(|(motion, residual)| TelemetrySample {
+                    motion: *motion,
+                    residual_position_m: Some(residual.0),
+                    residual_orientation_deg: Some(residual.1),
+                }),
+        ];
+
+        // Store the raw (offset-free) grip poses for the residual computation of the next poll
+        last_hand_motions = [
+            hand_telemetry_motions[0]
+                .map(|motion| (motion.pose * hand_offsets[0].inverse(), hand_offsets[0])),
+            hand_telemetry_motions[1]
+                .map(|motion| (motion.pose * hand_offsets[1].inverse(), hand_offsets[1])),
+        ];
+        last_head_motion = Some(head_motion_for_telemetry);
+        last_sample_time = Some(now);
+
         drop(int_ctx_lock);
+
+        core_ctx.log_input_sample(
+            target_time,
+            now,
+            head_sample,
+            [
+                hand_samples[0].map(|sample| (*HAND_LEFT_ID, sample)),
+                hand_samples[1].map(|sample| (*HAND_RIGHT_ID, sample)),
+            ],
+        );
 
         // Even though the server is already adding the motion-to-photon latency, here we use
         // target_time as the poll_timestamp to compensate for the fact that video frames are sent
