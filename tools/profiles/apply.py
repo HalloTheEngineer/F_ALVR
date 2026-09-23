@@ -16,12 +16,16 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 import time
 import urllib.request
 from pathlib import Path
 
-CONFIG_PATH = Path.home() / ".config" / "alvr" / "session.json"
+if sys.platform == "win32":
+    CONFIG_PATH = Path(os.environ["APPDATA"]) / "alvr" / "session.json"
+else:
+    CONFIG_PATH = Path.home() / ".config" / "alvr" / "session.json"
 PROFILES_DIR = Path(__file__).parent
 
 
