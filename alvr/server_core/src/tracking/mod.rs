@@ -218,7 +218,8 @@ impl TrackingManager {
             }
         }
 
-        let (newer_ts, newer_motion) = closest_newer?;        if sample_interpolation && let Some((older_ts, older_motion)) = closest_older {
+        let (newer_ts, newer_motion) = closest_newer?;
+        if sample_interpolation && let Some((older_ts, older_motion)) = closest_older {
             return Some(interpolate_motion(
                 older_motion,
                 newer_motion,
@@ -266,9 +267,15 @@ impl TrackingManager {
                 const MAX_ANGULAR_ACCEL: f32 = 200.0; // rad/s²
                 const MAX_LINEAR_ACCEL: f32 = 200.0; // m/s²
                 let angular_accel = ((motion.angular_velocity - prev_motion.angular_velocity) / dt)
-                    .clamp(Vec3::splat(-MAX_ANGULAR_ACCEL), Vec3::splat(MAX_ANGULAR_ACCEL));
+                    .clamp(
+                        Vec3::splat(-MAX_ANGULAR_ACCEL),
+                        Vec3::splat(MAX_ANGULAR_ACCEL),
+                    );
                 let linear_accel = ((motion.linear_velocity - prev_motion.linear_velocity) / dt)
-                    .clamp(Vec3::splat(-MAX_LINEAR_ACCEL), Vec3::splat(MAX_LINEAR_ACCEL));
+                    .clamp(
+                        Vec3::splat(-MAX_LINEAR_ACCEL),
+                        Vec3::splat(MAX_LINEAR_ACCEL),
+                    );
 
                 let delta_time_s = target_timestamp
                     .saturating_sub(sample_timestamp)
