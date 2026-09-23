@@ -169,7 +169,7 @@ alvr::EncodePipelineNvEnc::EncodePipelineNvEnc(
     encoder_ctx->max_b_frames = 0;
     encoder_ctx->gop_size = INT16_MAX;
     encoder_ctx->color_range = AVCOL_RANGE_JPEG;
-    auto params = FfiDynamicEncoderParams { };
+    auto params = FfiDynamicEncoderParams {};
     params.updated = true;
     params.bitrate_bps = 30'000'000;
     params.framerate = 60.0;
@@ -194,14 +194,14 @@ void alvr::EncodePipelineNvEnc::PushFrame(uint64_t targetTimestampNs, bool idr) 
     AVVkFrame* vkf = reinterpret_cast<AVVkFrame*>(vk_frame->data[0]);
     vkf->sem_value[0]++;
 
-    VkTimelineSemaphoreSubmitInfo timelineInfo = { };
+    VkTimelineSemaphoreSubmitInfo timelineInfo = {};
     timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
     timelineInfo.signalSemaphoreValueCount = 1;
     timelineInfo.pSignalSemaphoreValues = &vkf->sem_value[0];
 
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 
-    VkSubmitInfo submitInfo = { };
+    VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.pNext = &timelineInfo;
     submitInfo.waitSemaphoreCount = 1;

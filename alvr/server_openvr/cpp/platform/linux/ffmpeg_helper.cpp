@@ -63,21 +63,21 @@ alvr::VkContext::VkContext(
     vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, instanceExts.data());
     for (const char* name : instance_extensions) {
         auto it = std::find_if(
-            instanceExts.begin(), instanceExts.end(), [name](VkExtensionProperties e) {
-                return strcmp(e.extensionName, name) == 0;
-            }
+            instanceExts.begin(),
+            instanceExts.end(),
+            [name](VkExtensionProperties e) { return strcmp(e.extensionName, name) == 0; }
         );
         if (it != instanceExts.end()) {
             instanceExtensions.push_back(name);
         }
     }
 
-    VkApplicationInfo appInfo = { };
+    VkApplicationInfo appInfo = {};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "ALVR";
     appInfo.apiVersion = VK_API_VERSION_1_2;
 
-    VkInstanceCreateInfo instanceInfo = { };
+    VkInstanceCreateInfo instanceInfo = {};
     instanceInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     instanceInfo.pApplicationInfo = &appInfo;
 
@@ -96,10 +96,10 @@ alvr::VkContext::VkContext(
     std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
     VK_CHECK(vkEnumeratePhysicalDevices(instance, &deviceCount, physicalDevices.data()));
     for (VkPhysicalDevice dev : physicalDevices) {
-        VkPhysicalDeviceVulkan11Properties props11 = { };
+        VkPhysicalDeviceVulkan11Properties props11 = {};
         props11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES;
 
-        VkPhysicalDeviceProperties2 props = { };
+        VkPhysicalDeviceProperties2 props = {};
         props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
         props.pNext = &props11;
         vkGetPhysicalDeviceProperties2(dev, &props);
@@ -116,10 +116,10 @@ alvr::VkContext::VkContext(
         throw std::runtime_error("Failed to find vulkan device.");
     }
 
-    VkPhysicalDeviceDrmPropertiesEXT drmProps = { };
+    VkPhysicalDeviceDrmPropertiesEXT drmProps = {};
     drmProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRM_PROPERTIES_EXT;
 
-    VkPhysicalDeviceProperties2 deviceProps = { };
+    VkPhysicalDeviceProperties2 deviceProps = {};
     deviceProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     deviceProps.pNext = &drmProps;
     vkGetPhysicalDeviceProperties2(physicalDevice, &deviceProps);
@@ -162,7 +162,7 @@ alvr::VkContext::VkContext(
         if (compute && (queueFamilyIndex == VK_QUEUE_FAMILY_IGNORED || !graphics)) {
             queueFamilyIndex = i;
         }
-        VkDeviceQueueCreateInfo queueInfo = { };
+        VkDeviceQueueCreateInfo queueInfo = {};
         queueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueInfo.queueFamilyIndex = i;
         queueInfo.queueCount = 1;
@@ -170,16 +170,16 @@ alvr::VkContext::VkContext(
         queueInfos.push_back(queueInfo);
     }
 
-    VkPhysicalDeviceVulkan12Features features12 = { };
+    VkPhysicalDeviceVulkan12Features features12 = {};
     features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     features12.timelineSemaphore = true;
 
-    VkPhysicalDeviceFeatures2 features = { };
+    VkPhysicalDeviceFeatures2 features = {};
     features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
     features.pNext = &features12;
     features.features.samplerAnisotropy = VK_TRUE;
 
-    VkDeviceCreateInfo deviceInfo = { };
+    VkDeviceCreateInfo deviceInfo = {};
     deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     deviceInfo.pNext = &features;
     deviceInfo.queueCreateInfoCount = queueInfos.size();
@@ -194,7 +194,7 @@ alvr::VkContext::VkContext(
         if (fd == -1) {
             continue;
         }
-        struct stat s = { };
+        struct stat s = {};
         int ret = fstat(fd, &s);
         close(fd);
         if (ret != 0) {
@@ -313,16 +313,16 @@ alvr::VkFrame::VkFrame(
     av_vkframe->size[0] = size;
     av_vkframe->layout[0] = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    VkExportSemaphoreCreateInfo exportInfo = { };
+    VkExportSemaphoreCreateInfo exportInfo = {};
     exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
     exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
 
-    VkSemaphoreTypeCreateInfo timelineInfo = { };
+    VkSemaphoreTypeCreateInfo timelineInfo = {};
     timelineInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
     timelineInfo.pNext = &exportInfo;
     timelineInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
 
-    VkSemaphoreCreateInfo semInfo = { };
+    VkSemaphoreCreateInfo semInfo = {};
     semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     semInfo.pNext = &timelineInfo;
     vkCreateSemaphore(device, &semInfo, nullptr, &av_vkframe->sem[0]);

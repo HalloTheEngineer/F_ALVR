@@ -180,7 +180,7 @@ void Hmd::OnPoseUpdated(uint64_t targetTimestampNs, FfiDeviceMotion motion) {
     if (this->object_id == vr::k_unTrackedDeviceIndexInvalid) {
         return;
     }
-    auto pose = vr::DriverPose_t { };
+    auto pose = vr::DriverPose_t {};
     pose.poseIsValid = true;
     pose.result = vr::TrackingResult_Running_OK;
     pose.deviceIsConnected = true;
@@ -291,7 +291,7 @@ void Hmd::SetViewParams(const FfiViewParams params[2]) {
 
     // todo: check if this is still needed
     vr::VRServerDriverHost()->VendorSpecificEvent(
-        object_id, vr::VREvent_LensDistortionChanged, { }, 0
+        object_id, vr::VREvent_LensDistortionChanged, {}, 0
     );
 }
 

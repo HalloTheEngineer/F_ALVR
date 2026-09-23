@@ -228,13 +228,13 @@ alvr::EncodePipelineVAAPI::EncodePipelineVAAPI(
     encoder_ctx->max_b_frames = 0;
     encoder_ctx->color_range = AVCOL_RANGE_JPEG;
 
-    auto params = FfiDynamicEncoderParams { };
+    auto params = FfiDynamicEncoderParams {};
     params.updated = true;
     params.bitrate_bps = 30'000'000;
     params.framerate = settings->m_refreshRate;
     SetParams(params);
 
-    vlVaQualityBits quality = { };
+    vlVaQualityBits quality = {};
     quality.vbaq_mode
         = Settings_Instance()
               ->m_enableVbaq; // No noticable performance difference and should improve subjective
