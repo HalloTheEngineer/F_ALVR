@@ -536,6 +536,7 @@ impl Drop for StreamContext {
     }
 }
 
+#[expect(clippy::too_many_arguments)]
 fn stream_input_loop(
     core_ctx: &ClientCoreContext,
     xr_session: xr::Session<xr::OpenGlEs>,
