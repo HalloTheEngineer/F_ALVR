@@ -666,8 +666,8 @@ fn stream_input_loop(
         if let Some(last_time) = last_sample_time {
             let xr_last_time = crate::to_xr_time(last_time);
 
-            let valid_flags = xr::SpaceLocationFlags::POSITION_VALID
-                | xr::SpaceLocationFlags::ORIENTATION_VALID;
+            let valid_flags =
+                xr::SpaceLocationFlags::POSITION_VALID | xr::SpaceLocationFlags::ORIENTATION_VALID;
 
             if let Some(last_motion) = &last_head_motion
                 && let Ok(relocated) =
@@ -683,8 +683,9 @@ fn stream_input_loop(
 
             for (hand_idx, hand_source) in int_ctx.hands_interaction.iter().enumerate() {
                 if let Some((last_raw_pose, _)) = &last_hand_motions[hand_idx]
-                    && let Ok(relocated) =
-                        hand_source.grip_space.locate(stage_reference_space, xr_last_time)
+                    && let Ok(relocated) = hand_source
+                        .grip_space
+                        .locate(stage_reference_space, xr_last_time)
                     && relocated.location_flags.contains(valid_flags)
                 {
                     let (res_pos, res_ori) = alvr_client_core::pose_residual(

@@ -11,8 +11,7 @@ use alvr_adb::{WiredConnection, WiredConnectionStatus};
 use alvr_common::{
     ALVR_VERSION, AlvrFoveatedEncodingParams, AnyhowToCon, BUTTON_INFO, CONTROLLER_PROFILE_INFO,
     ConResult, ConnectionError, ConnectionState, LifecycleState, QUEST_CONTROLLER_PROFILE_PATH,
-    TelemetryLogger, con_bail,
-    dbg_connection, debug, error,
+    TelemetryLogger, con_bail, dbg_connection, debug, error,
     glam::{UVec2, Vec2},
     info,
     parking_lot::{Condvar, Mutex, RwLock},
@@ -34,6 +33,7 @@ use alvr_sockets::{
     CONTROL_PORT, KEEPALIVE_INTERVAL, KEEPALIVE_TIMEOUT, ProtoControlSocket, SocketConnection,
     StreamSocketConfig, WIRED_CLIENT_HOSTNAME,
 };
+use serde_json::json;
 use std::{
     collections::{HashMap, hash_map::DefaultHasher},
     hash::{Hash, Hasher},
@@ -43,7 +43,6 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-use serde_json::json;
 
 const RETRY_CONNECT_MIN_INTERVAL: Duration = Duration::from_secs(1);
 const HANDSHAKE_ACTION_TIMEOUT: Duration = Duration::from_secs(2);

@@ -332,9 +332,12 @@ impl ClientCoreContext {
         head: TelemetrySample,
         hands: [Option<(u64, TelemetrySample)>; 2],
     ) {
-        self.connection_context
-            .telemetry
-            .log_input_sample(poll_timestamp, now_timestamp, &head, hands);
+        self.connection_context.telemetry.log_input_sample(
+            poll_timestamp,
+            now_timestamp,
+            &head,
+            hands,
+        );
     }
 
     pub fn platform(&self) -> Platform {

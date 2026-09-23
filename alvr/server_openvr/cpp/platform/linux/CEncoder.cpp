@@ -202,7 +202,7 @@ void CEncoder::Run() {
 
         av_log_set_callback(av_logfn);
 
-        alvr::VkContext vk_ctx(init.device_uuid.data(), {});
+        alvr::VkContext vk_ctx(init.device_uuid.data(), { });
 
         FrameRender render(vk_ctx, init, m_fds);
         auto output = render.CreateOutput();

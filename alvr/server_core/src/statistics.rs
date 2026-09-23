@@ -59,10 +59,7 @@ pub struct StatisticsManager {
 
 impl StatisticsManager {
     // history size used to calculate average total pipeline latency
-    pub fn new(
-        max_history_size: usize,
-        nominal_server_frame_interval: Duration,
-    ) -> Self {
+    pub fn new(max_history_size: usize, nominal_server_frame_interval: Duration) -> Self {
         Self {
             history_buffer: VecDeque::new(),
             max_history_size,

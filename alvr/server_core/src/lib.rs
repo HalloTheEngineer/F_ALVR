@@ -17,11 +17,11 @@ pub use tracking::HandType;
 use crate::connection::VideoPacket;
 use alvr_common::{
     AlvrFoveatedEncodingParams, ConnectionState, DEVICE_ID_TO_PATH, DeviceMotion, LifecycleState,
-    Pose, TelemetryLogger, ViewParams, dbg_server_core, error, unix_timestamp_ms,
+    Pose, TelemetryLogger, ViewParams, dbg_server_core, error,
     glam::{UVec2, Vec2},
     parking_lot::{Mutex, RwLock},
     settings_schema::Switch,
-    warn,
+    unix_timestamp_ms, warn,
 };
 use alvr_events::{EventType, HapticsEvent};
 use alvr_filesystem as afs;

@@ -74,8 +74,9 @@ Renderer::Renderer(
     d.haveCalibratedTimestamps = checkExtension(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
 
     if (!checkExtension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)) {
-        throw std::runtime_error("Vulkan: Required extension " VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME
-                                 " not available");
+        throw std::runtime_error(
+            "Vulkan: Required extension " VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME " not available"
+        );
     }
 
 #define VK_LOAD_PFN(name) d.name = (PFN_##name)vkGetInstanceProcAddr(m_inst, #name)
@@ -87,7 +88,7 @@ Renderer::Renderer(
     VK_LOAD_PFN(vkCmdPushDescriptorSetKHR);
 #undef VK_LOAD_PFN
 
-    VkPhysicalDeviceProperties props = {};
+    VkPhysicalDeviceProperties props = { };
     vkGetPhysicalDeviceProperties(m_physDev, &props);
     m_timestampPeriod = props.limits.timestampPeriod;
 }
@@ -128,20 +129,20 @@ void Renderer::Startup(uint32_t width, uint32_t height, VkFormat format) {
     vkGetDeviceQueue(m_dev, m_queueFamilyIndex, 0, &m_queue);
 
     // Timestamp query
-    VkQueryPoolCreateInfo queryPoolInfo = {};
+    VkQueryPoolCreateInfo queryPoolInfo = { };
     queryPoolInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
     queryPoolInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
     queryPoolInfo.queryCount = 2;
     VK_CHECK(vkCreateQueryPool(m_dev, &queryPoolInfo, nullptr, &m_queryPool));
 
     // Command buffer
-    VkCommandPoolCreateInfo cmdPoolInfo = {};
+    VkCommandPoolCreateInfo cmdPoolInfo = { };
     cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     cmdPoolInfo.queueFamilyIndex = m_queueFamilyIndex;
     cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     VK_CHECK(vkCreateCommandPool(m_dev, &cmdPoolInfo, nullptr, &m_commandPool));
 
-    VkCommandBufferAllocateInfo commandBufferInfo = {};
+    VkCommandBufferAllocateInfo commandBufferInfo = { };
     commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     commandBufferInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     commandBufferInfo.commandPool = m_commandPool;
@@ -149,7 +150,7 @@ void Renderer::Startup(uint32_t width, uint32_t height, VkFormat format) {
     VK_CHECK(vkAllocateCommandBuffers(m_dev, &commandBufferInfo, &m_commandBuffer));
 
     // Sampler
-    VkSamplerCreateInfo samplerInfo = {};
+    VkSamplerCreateInfo samplerInfo = { };
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     samplerInfo.magFilter = VK_FILTER_LINEAR;
     samplerInfo.minFilter = VK_FILTER_LINEAR;
@@ -163,7 +164,7 @@ void Renderer::Startup(uint32_t width, uint32_t height, VkFormat format) {
     VK_CHECK(vkCreateSampler(m_dev, &samplerInfo, nullptr, &m_sampler));
 
     // Descriptors
-    VkDescriptorSetLayoutBinding descriptorBindings[2] = {};
+    VkDescriptorSetLayoutBinding descriptorBindings[2] = { };
     descriptorBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptorBindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     descriptorBindings[0].descriptorCount = 1;
@@ -174,7 +175,7 @@ void Renderer::Startup(uint32_t width, uint32_t height, VkFormat format) {
     descriptorBindings[1].descriptorCount = 1;
     descriptorBindings[1].binding = 1;
 
-    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = {};
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { };
     descriptorSetLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     descriptorSetLayoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
     descriptorSetLayoutInfo.bindingCount = 2;
@@ -184,7 +185,7 @@ void Renderer::Startup(uint32_t width, uint32_t height, VkFormat format) {
     );
 
     // Fence
-    VkFenceCreateInfo fenceInfo = {};
+    VkFenceCreateInfo fenceInfo = { };
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     VK_CHECK(vkCreateFence(m_dev, &fenceInfo, nullptr, &m_fence));
 }
@@ -192,7 +193,7 @@ void Renderer::Startup(uint32_t width, uint32_t height, VkFormat format) {
 void Renderer::AddImage(
     VkImageCreateInfo imageInfo, size_t memoryIndex, int imageFd, int semaphoreFd
 ) {
-    VkExternalMemoryImageCreateInfo extMemImageInfo = {};
+    VkExternalMemoryImageCreateInfo extMemImageInfo = { };
     extMemImageInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
     extMemImageInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     imageInfo.pNext = &extMemImageInfo;
@@ -203,17 +204,17 @@ void Renderer::AddImage(
     VkMemoryRequirements req;
     vkGetImageMemoryRequirements(m_dev, image, &req);
 
-    VkMemoryDedicatedAllocateInfo dedicatedMemInfo = {};
+    VkMemoryDedicatedAllocateInfo dedicatedMemInfo = { };
     dedicatedMemInfo.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
     dedicatedMemInfo.image = image;
 
-    VkImportMemoryFdInfoKHR importMemInfo = {};
+    VkImportMemoryFdInfoKHR importMemInfo = { };
     importMemInfo.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR;
     importMemInfo.pNext = &dedicatedMemInfo;
     importMemInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     importMemInfo.fd = imageFd;
 
-    VkMemoryAllocateInfo memAllocInfo = {};
+    VkMemoryAllocateInfo memAllocInfo = { };
     memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memAllocInfo.pNext = &importMemInfo;
     memAllocInfo.allocationSize = req.size;
@@ -223,29 +224,29 @@ void Renderer::AddImage(
     VK_CHECK(vkAllocateMemory(m_dev, &memAllocInfo, nullptr, &mem));
     VK_CHECK(vkBindImageMemory(m_dev, image, mem, 0));
 
-    VkSemaphoreTypeCreateInfo timelineInfo = {};
+    VkSemaphoreTypeCreateInfo timelineInfo = { };
     timelineInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
     timelineInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
 
-    VkSemaphoreCreateInfo semInfo = {};
+    VkSemaphoreCreateInfo semInfo = { };
     semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     semInfo.pNext = &timelineInfo;
     VkSemaphore semaphore;
     VK_CHECK(vkCreateSemaphore(m_dev, &semInfo, nullptr, &semaphore));
 
-    VkImportSemaphoreFdInfoKHR impSemInfo = {};
+    VkImportSemaphoreFdInfoKHR impSemInfo = { };
     impSemInfo.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR;
     impSemInfo.semaphore = semaphore;
     impSemInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
     impSemInfo.fd = semaphoreFd;
     VK_CHECK(d.vkImportSemaphoreFdKHR(m_dev, &impSemInfo));
 
-    VkImageViewCreateInfo viewInfo = {};
+    VkImageViewCreateInfo viewInfo = { };
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = imageInfo.format;
     viewInfo.image = image;
-    viewInfo.subresourceRange = {};
+    viewInfo.subresourceRange = { };
     viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = 1;
@@ -271,7 +272,7 @@ void Renderer::AddPipeline(RenderPipeline* pipeline) {
 }
 
 void Renderer::CreateOutput(uint32_t width, uint32_t height, ExternalHandle handle) {
-    m_output.imageInfo = {};
+    m_output.imageInfo = { };
     m_output.imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     m_output.imageInfo.imageType = VK_IMAGE_TYPE_2D;
     m_output.imageInfo.format = m_format;
@@ -287,20 +288,20 @@ void Renderer::CreateOutput(uint32_t width, uint32_t height, ExternalHandle hand
 
     std::vector<VkDrmFormatModifierPropertiesEXT> modifierProps;
 
-    VkExternalMemoryImageCreateInfo extMemImageInfo = {};
+    VkExternalMemoryImageCreateInfo extMemImageInfo = { };
     extMemImageInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
 
     if (d.haveDrmModifiers && handle == ExternalHandle::DmaBuf) {
-        VkImageDrmFormatModifierListCreateInfoEXT modifierListInfo = {};
+        VkImageDrmFormatModifierListCreateInfoEXT modifierListInfo = { };
         modifierListInfo.sType = VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_LIST_CREATE_INFO_EXT;
 
         m_output.imageInfo.pNext = &modifierListInfo;
         m_output.imageInfo.tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT;
 
-        VkDrmFormatModifierPropertiesListEXT modifierPropsList = {};
+        VkDrmFormatModifierPropertiesListEXT modifierPropsList = { };
         modifierPropsList.sType = VK_STRUCTURE_TYPE_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_EXT;
 
-        VkFormatProperties2 formatProps = {};
+        VkFormatProperties2 formatProps = { };
         formatProps.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
         formatProps.pNext = &modifierPropsList;
         vkGetPhysicalDeviceFormatProperties2(m_physDev, m_output.imageInfo.format, &formatProps);
@@ -319,14 +320,14 @@ void Renderer::CreateOutput(uint32_t width, uint32_t height, ExternalHandle hand
                 continue;
             }
 
-            VkPhysicalDeviceImageDrmFormatModifierInfoEXT modInfo = {};
+            VkPhysicalDeviceImageDrmFormatModifierInfoEXT modInfo = { };
             modInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT;
             modInfo.drmFormatModifier = prop.drmFormatModifier;
             modInfo.sharingMode = m_output.imageInfo.sharingMode;
             modInfo.queueFamilyIndexCount = m_output.imageInfo.queueFamilyIndexCount;
             modInfo.pQueueFamilyIndices = m_output.imageInfo.pQueueFamilyIndices;
 
-            VkPhysicalDeviceImageFormatInfo2 formatInfo = {};
+            VkPhysicalDeviceImageFormatInfo2 formatInfo = { };
             formatInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2;
             formatInfo.pNext = &modInfo;
             formatInfo.format = m_output.imageInfo.format;
@@ -335,7 +336,7 @@ void Renderer::CreateOutput(uint32_t width, uint32_t height, ExternalHandle hand
             formatInfo.usage = m_output.imageInfo.usage;
             formatInfo.flags = m_output.imageInfo.flags;
 
-            VkImageFormatProperties2 imageFormatProps = {};
+            VkImageFormatProperties2 imageFormatProps = { };
             imageFormatProps.sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2;
             imageFormatProps.pNext = NULL;
 
@@ -370,31 +371,31 @@ void Renderer::CreateOutput(uint32_t width, uint32_t height, ExternalHandle hand
         VK_CHECK(vkCreateImage(m_dev, &m_output.imageInfo, nullptr, &m_output.image));
     }
 
-    VkMemoryDedicatedRequirements mdr = {};
+    VkMemoryDedicatedRequirements mdr = { };
     mdr.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS;
 
-    VkMemoryRequirements2 memoryReqs = {};
+    VkMemoryRequirements2 memoryReqs = { };
     memoryReqs.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
     memoryReqs.pNext = &mdr;
 
-    VkImageMemoryRequirementsInfo2 memoryReqsInfo = {};
+    VkImageMemoryRequirementsInfo2 memoryReqsInfo = { };
     memoryReqsInfo.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2;
     memoryReqsInfo.image = m_output.image;
     vkGetImageMemoryRequirements2(m_dev, &memoryReqsInfo, &memoryReqs);
     m_output.size = memoryReqs.memoryRequirements.size;
 
-    VkExportMemoryAllocateInfo memory_export_info = {};
+    VkExportMemoryAllocateInfo memory_export_info = { };
     memory_export_info.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
     memory_export_info.handleTypes = extMemImageInfo.handleTypes;
 
-    VkMemoryDedicatedAllocateInfo memory_dedicated_info = {};
+    VkMemoryDedicatedAllocateInfo memory_dedicated_info = { };
     memory_dedicated_info.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
     memory_dedicated_info.image = m_output.image;
     if (handle != ExternalHandle::None) {
         memory_dedicated_info.pNext = &memory_export_info;
     }
 
-    VkMemoryAllocateInfo memi = {};
+    VkMemoryAllocateInfo memi = { };
     memi.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memi.pNext = &memory_dedicated_info;
     memi.allocationSize = memoryReqs.memoryRequirements.size;
@@ -403,7 +404,7 @@ void Renderer::CreateOutput(uint32_t width, uint32_t height, ExternalHandle hand
     );
     VK_CHECK(vkAllocateMemory(m_dev, &memi, nullptr, &m_output.memory));
 
-    VkBindImageMemoryInfo bimi = {};
+    VkBindImageMemoryInfo bimi = { };
     bimi.sType = VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO;
     bimi.image = m_output.image;
     bimi.memory = m_output.memory;
@@ -412,7 +413,7 @@ void Renderer::CreateOutput(uint32_t width, uint32_t height, ExternalHandle hand
 
     // DRM export
     if (d.haveDmaBuf) {
-        VkMemoryGetFdInfoKHR memoryGetFdInfo = {};
+        VkMemoryGetFdInfoKHR memoryGetFdInfo = { };
         memoryGetFdInfo.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
         memoryGetFdInfo.memory = m_output.memory;
         memoryGetFdInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
@@ -421,7 +422,7 @@ void Renderer::CreateOutput(uint32_t width, uint32_t height, ExternalHandle hand
             std::cout << "vkGetMemoryFdKHR " << result_to_str(res) << std::endl;
         } else {
             if (d.haveDrmModifiers) {
-                VkImageDrmFormatModifierPropertiesEXT imageDrmProps = {};
+                VkImageDrmFormatModifierPropertiesEXT imageDrmProps = { };
                 imageDrmProps.sType = VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_PROPERTIES_EXT;
                 d.vkGetImageDrmFormatModifierPropertiesEXT(m_dev, m_output.image, &imageDrmProps);
                 if (res != VK_SUCCESS) {
@@ -441,7 +442,7 @@ void Renderer::CreateOutput(uint32_t width, uint32_t height, ExternalHandle hand
             }
 
             for (uint32_t i = 0; i < m_output.drm.planes; i++) {
-                VkImageSubresource subresource = {};
+                VkImageSubresource subresource = { };
                 if (d.haveDrmModifiers) {
                     subresource.aspectMask = VK_IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT << i;
                 } else {
@@ -456,12 +457,12 @@ void Renderer::CreateOutput(uint32_t width, uint32_t height, ExternalHandle hand
         m_output.drm.format = to_drm_format(m_output.imageInfo.format);
     }
 
-    VkImageViewCreateInfo viewInfo = {};
+    VkImageViewCreateInfo viewInfo = { };
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = m_output.imageInfo.format;
     viewInfo.image = m_output.image;
-    viewInfo.subresourceRange = {};
+    viewInfo.subresourceRange = { };
     viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = 1;
@@ -473,7 +474,7 @@ void Renderer::CreateOutput(uint32_t width, uint32_t height, ExternalHandle hand
     viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
     VK_CHECK(vkCreateImageView(m_dev, &viewInfo, nullptr, &m_output.view));
 
-    VkSemaphoreCreateInfo semInfo = {};
+    VkSemaphoreCreateInfo semInfo = { };
     semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     VK_CHECK(vkCreateSemaphore(m_dev, &semInfo, nullptr, &m_output.semaphore));
 }
@@ -486,17 +487,17 @@ void Renderer::ImportOutput(const DrmImage& drm) {
     m_output.drm = drm;
     m_output.imageInfo.tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT;
 
-    VkExternalMemoryImageCreateInfo extMemImageInfo = {};
+    VkExternalMemoryImageCreateInfo extMemImageInfo = { };
     extMemImageInfo.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
     extMemImageInfo.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
     m_output.imageInfo.pNext = &extMemImageInfo;
 
-    VkSubresourceLayout layouts[4] = {};
+    VkSubresourceLayout layouts[4] = { };
     for (uint32_t i = 0; i < drm.planes; ++i) {
         layouts[i].offset = drm.offsets[i];
         layouts[i].rowPitch = drm.strides[i];
     }
-    VkImageDrmFormatModifierExplicitCreateInfoEXT modifierInfo = {};
+    VkImageDrmFormatModifierExplicitCreateInfoEXT modifierInfo = { };
     modifierInfo.sType = VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_EXPLICIT_CREATE_INFO_EXT;
     modifierInfo.drmFormatModifier = drm.modifier;
     modifierInfo.drmFormatModifierPlaneCount = drm.planes;
@@ -505,53 +506,53 @@ void Renderer::ImportOutput(const DrmImage& drm) {
 
     VK_CHECK(vkCreateImage(m_dev, &m_output.imageInfo, NULL, &m_output.image));
 
-    VkMemoryFdPropertiesKHR fdProps = {};
+    VkMemoryFdPropertiesKHR fdProps = { };
     fdProps.sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR;
     VK_CHECK(d.vkGetMemoryFdPropertiesKHR(
         m_dev, VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT, drm.fd, &fdProps
     ));
 
-    VkImageMemoryRequirementsInfo2 memoryReqsInfo = {};
+    VkImageMemoryRequirementsInfo2 memoryReqsInfo = { };
     memoryReqsInfo.image = m_output.image;
     memoryReqsInfo.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2;
 
-    VkMemoryRequirements2 memoryReqs = {};
+    VkMemoryRequirements2 memoryReqs = { };
     memoryReqs.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
     vkGetImageMemoryRequirements2(m_dev, &memoryReqsInfo, &memoryReqs);
 
-    VkMemoryAllocateInfo memoryAllocInfo = {};
+    VkMemoryAllocateInfo memoryAllocInfo = { };
     memoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memoryAllocInfo.allocationSize = memoryReqs.memoryRequirements.size;
     memoryAllocInfo.memoryTypeIndex = memoryTypeIndex(
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, memoryReqs.memoryRequirements.memoryTypeBits
     );
 
-    VkImportMemoryFdInfoKHR importMemInfo = {};
+    VkImportMemoryFdInfoKHR importMemInfo = { };
     importMemInfo.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR;
     importMemInfo.fd = drm.fd;
     importMemInfo.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
     memoryAllocInfo.pNext = &importMemInfo;
 
-    VkMemoryDedicatedAllocateInfo dedicatedMemInfo = {};
+    VkMemoryDedicatedAllocateInfo dedicatedMemInfo = { };
     dedicatedMemInfo.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO;
     dedicatedMemInfo.image = m_output.image;
     importMemInfo.pNext = &dedicatedMemInfo;
 
     VK_CHECK(vkAllocateMemory(m_dev, &memoryAllocInfo, NULL, &m_output.memory));
 
-    VkBindImageMemoryInfo bindInfo = {};
+    VkBindImageMemoryInfo bindInfo = { };
     bindInfo.sType = VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO;
     bindInfo.image = m_output.image;
     bindInfo.memory = m_output.memory;
     bindInfo.memoryOffset = 0;
     VK_CHECK(vkBindImageMemory2(m_dev, 1, &bindInfo));
 
-    VkImageViewCreateInfo viewInfo = {};
+    VkImageViewCreateInfo viewInfo = { };
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = m_output.imageInfo.format;
     viewInfo.image = m_output.image;
-    viewInfo.subresourceRange = {};
+    viewInfo.subresourceRange = { };
     viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = 1;
@@ -566,7 +567,7 @@ void Renderer::ImportOutput(const DrmImage& drm) {
 
 void Renderer::Render(uint32_t index, uint64_t waitValue) {
     if (!m_inputImageCapture.empty()) {
-        VkSemaphoreWaitInfo waitInfo = {};
+        VkSemaphoreWaitInfo waitInfo = { };
         waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
         waitInfo.semaphoreCount = 1;
         waitInfo.pSemaphores = &m_images[index].semaphore;
@@ -584,7 +585,7 @@ void Renderer::Render(uint32_t index, uint64_t waitValue) {
         m_inputImageCapture.clear();
     }
 
-    VkCommandBufferBeginInfo commandBufferBegin = {};
+    VkCommandBufferBeginInfo commandBufferBegin = { };
     commandBufferBegin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     VK_CHECK(vkBeginCommandBuffer(m_commandBuffer, &commandBufferBegin));
 
@@ -592,7 +593,7 @@ void Renderer::Render(uint32_t index, uint64_t waitValue) {
     vkCmdWriteTimestamp(m_commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_queryPool, 0);
 
     for (size_t i = 0; i < m_pipelines.size(); ++i) {
-        VkRect2D rect = {};
+        VkRect2D rect = { };
         VkImage in = VK_NULL_HANDLE;
         VkImageView inView = VK_NULL_HANDLE;
         VkImageLayout* inLayout = nullptr;
@@ -623,7 +624,7 @@ void Renderer::Render(uint32_t index, uint64_t waitValue) {
             outLayout = &img.layout;
             rect.extent = m_imageSize;
         }
-        VkImageMemoryBarrier imageBarrier = {};
+        VkImageMemoryBarrier imageBarrier = { };
         imageBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         imageBarrier.subresourceRange.layerCount = 1;
@@ -668,14 +669,14 @@ void Renderer::Render(uint32_t index, uint64_t waitValue) {
 
     VK_CHECK(vkEndCommandBuffer(m_commandBuffer));
 
-    VkTimelineSemaphoreSubmitInfo timelineInfo = {};
+    VkTimelineSemaphoreSubmitInfo timelineInfo = { };
     timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
     timelineInfo.waitSemaphoreValueCount = 1;
     timelineInfo.pWaitSemaphoreValues = &waitValue;
 
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 
-    VkSubmitInfo submitInfo = {};
+    VkSubmitInfo submitInfo = { };
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.pNext = &timelineInfo;
     submitInfo.waitSemaphoreCount = 1;
@@ -691,7 +692,7 @@ void Renderer::Render(uint32_t index, uint64_t waitValue) {
 void Renderer::Sync() {
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 
-    VkSubmitInfo submitInfo = {};
+    VkSubmitInfo submitInfo = { };
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = &m_output.semaphore;
@@ -723,7 +724,7 @@ Renderer::Timestamps Renderer::GetTimestamps() {
     queries[0] *= m_timestampPeriod;
     queries[1] *= m_timestampPeriod;
 
-    VkCalibratedTimestampInfoEXT timestampInfo = {};
+    VkCalibratedTimestampInfoEXT timestampInfo = { };
     timestampInfo.sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT;
     timestampInfo.timeDomain = VK_TIME_DOMAIN_DEVICE_EXT;
     uint64_t deviation;
@@ -792,7 +793,7 @@ std::string Renderer::result_to_str(VkResult result) {
 }
 
 void Renderer::commandBufferBegin() {
-    VkCommandBufferBeginInfo commandBufferBegin = {};
+    VkCommandBufferBeginInfo commandBufferBegin = { };
     commandBufferBegin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     VK_CHECK(vkBeginCommandBuffer(m_commandBuffer, &commandBufferBegin));
 }
@@ -800,11 +801,11 @@ void Renderer::commandBufferBegin() {
 void Renderer::commandBufferSubmit() {
     VK_CHECK(vkEndCommandBuffer(m_commandBuffer));
 
-    VkSubmitInfo submitInfo = {};
+    VkSubmitInfo submitInfo = { };
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &m_commandBuffer;
-    VkFenceCreateInfo fenceInfo = {};
+    VkFenceCreateInfo fenceInfo = { };
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     VkFence fence;
     VK_CHECK(vkCreateFence(m_dev, &fenceInfo, nullptr, &fence));
@@ -814,8 +815,8 @@ void Renderer::commandBufferSubmit() {
 }
 
 void Renderer::addStagingImage(uint32_t width, uint32_t height) {
-    VkImageCreateInfo imageInfo = {};
-    imageInfo = {};
+    VkImageCreateInfo imageInfo = { };
+    imageInfo = { };
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
     imageInfo.format = m_format;
@@ -834,7 +835,7 @@ void Renderer::addStagingImage(uint32_t width, uint32_t height) {
 
     VkMemoryRequirements memoryReqs;
     vkGetImageMemoryRequirements(m_dev, image, &memoryReqs);
-    VkMemoryAllocateInfo memoryAllocInfo = {};
+    VkMemoryAllocateInfo memoryAllocInfo = { };
     memoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memoryAllocInfo.allocationSize = memoryReqs.size;
     memoryAllocInfo.memoryTypeIndex
@@ -843,12 +844,12 @@ void Renderer::addStagingImage(uint32_t width, uint32_t height) {
     VK_CHECK(vkAllocateMemory(m_dev, &memoryAllocInfo, nullptr, &memory));
     VK_CHECK(vkBindImageMemory(m_dev, image, memory, 0));
 
-    VkImageViewCreateInfo viewInfo = {};
+    VkImageViewCreateInfo viewInfo = { };
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = imageInfo.format;
     viewInfo.image = image;
-    viewInfo.subresourceRange = {};
+    viewInfo.subresourceRange = { };
     viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = 1;
@@ -872,7 +873,7 @@ void Renderer::dumpImage(
     uint32_t height,
     const std::string& filename
 ) {
-    VkImageCreateInfo imageInfo = {};
+    VkImageCreateInfo imageInfo = { };
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
     imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -889,7 +890,7 @@ void Renderer::dumpImage(
     VK_CHECK(vkCreateImage(m_dev, &imageInfo, nullptr, &dstImage));
 
     VkMemoryRequirements memReqs;
-    VkMemoryAllocateInfo memAllocInfo {};
+    VkMemoryAllocateInfo memAllocInfo { };
     memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     vkGetImageMemoryRequirements(m_dev, dstImage, &memReqs);
     memAllocInfo.allocationSize = memReqs.size;
@@ -902,12 +903,12 @@ void Renderer::dumpImage(
     VK_CHECK(vkAllocateMemory(m_dev, &memAllocInfo, nullptr, &dstMemory));
     VK_CHECK(vkBindImageMemory(m_dev, dstImage, dstMemory, 0));
 
-    VkImageViewCreateInfo viewInfo = {};
+    VkImageViewCreateInfo viewInfo = { };
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = imageInfo.format;
     viewInfo.image = dstImage;
-    viewInfo.subresourceRange = {};
+    viewInfo.subresourceRange = { };
     viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     viewInfo.subresourceRange.baseMipLevel = 0;
     viewInfo.subresourceRange.levelCount = 1;
@@ -921,7 +922,7 @@ void Renderer::dumpImage(
     VK_CHECK(vkCreateImageView(m_dev, &viewInfo, nullptr, &dstView));
 
     std::array<VkImageMemoryBarrier, 2> imageBarrierIn;
-    imageBarrierIn[0] = {};
+    imageBarrierIn[0] = { };
     imageBarrierIn[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     imageBarrierIn[0].oldLayout = imageLayout;
     imageBarrierIn[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -931,7 +932,7 @@ void Renderer::dumpImage(
     imageBarrierIn[0].subresourceRange.levelCount = 1;
     imageBarrierIn[0].srcAccessMask = 0;
     imageBarrierIn[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    imageBarrierIn[1] = {};
+    imageBarrierIn[1] = { };
     imageBarrierIn[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     imageBarrierIn[1].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageBarrierIn[1].newLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -943,7 +944,7 @@ void Renderer::dumpImage(
     imageBarrierIn[1].dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 
     // Shader
-    VkShaderModuleCreateInfo moduleInfo = {};
+    VkShaderModuleCreateInfo moduleInfo = { };
     moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     moduleInfo.codeSize = m_quadShaderSize;
     moduleInfo.pCode = m_quadShaderCode;
@@ -951,20 +952,20 @@ void Renderer::dumpImage(
     VK_CHECK(vkCreateShaderModule(m_dev, &moduleInfo, nullptr, &shader));
 
     // Pipeline
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = { };
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &m_descriptorLayout;
     VkPipelineLayout pipelineLayout;
     VK_CHECK(vkCreatePipelineLayout(m_dev, &pipelineLayoutInfo, nullptr, &pipelineLayout));
 
-    VkPipelineShaderStageCreateInfo stageInfo = {};
+    VkPipelineShaderStageCreateInfo stageInfo = { };
     stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     stageInfo.pName = "main";
     stageInfo.module = shader;
 
-    VkComputePipelineCreateInfo pipelineInfo = {};
+    VkComputePipelineCreateInfo pipelineInfo = { };
     pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     pipelineInfo.layout = pipelineLayout;
     pipelineInfo.stage = stageInfo;
@@ -972,7 +973,7 @@ void Renderer::dumpImage(
     VK_CHECK(vkCreateComputePipelines(m_dev, nullptr, 1, &pipelineInfo, nullptr, &pipeline));
 
     std::array<VkImageMemoryBarrier, 2> imageBarrierOut;
-    imageBarrierOut[0] = {};
+    imageBarrierOut[0] = { };
     imageBarrierOut[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     imageBarrierOut[0].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     imageBarrierOut[0].newLayout = imageLayout;
@@ -982,7 +983,7 @@ void Renderer::dumpImage(
     imageBarrierOut[0].subresourceRange.levelCount = 1;
     imageBarrierOut[0].srcAccessMask = 0;
     imageBarrierOut[0].dstAccessMask = 0;
-    imageBarrierOut[1] = {};
+    imageBarrierOut[1] = { };
     imageBarrierOut[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     imageBarrierOut[1].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     imageBarrierOut[1].newLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -995,15 +996,15 @@ void Renderer::dumpImage(
 
     std::vector<VkWriteDescriptorSet> descriptorWriteSets;
 
-    VkDescriptorImageInfo descriptorImageInfoIn = {};
+    VkDescriptorImageInfo descriptorImageInfoIn = { };
     descriptorImageInfoIn.imageView = imageView;
     descriptorImageInfoIn.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    VkDescriptorImageInfo descriptorImageInfoOut = {};
+    VkDescriptorImageInfo descriptorImageInfoOut = { };
     descriptorImageInfoOut.imageView = dstView;
     descriptorImageInfoOut.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkWriteDescriptorSet descriptorWriteSet = {};
+    VkWriteDescriptorSet descriptorWriteSet = { };
     descriptorWriteSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWriteSet.descriptorCount = 1;
     descriptorWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1055,7 +1056,7 @@ void Renderer::dumpImage(
     );
     commandBufferSubmit();
 
-    VkImageSubresource subresource = {};
+    VkImageSubresource subresource = { };
     subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     VkSubresourceLayout layout;
     vkGetImageSubresourceLayout(m_dev, dstImage, &subresource, &layout);
@@ -1125,7 +1126,7 @@ void RenderPipeline::SetShader(const char* filename) {
 }
 
 void RenderPipeline::SetShader(const unsigned char* data, unsigned len) {
-    VkShaderModuleCreateInfo moduleInfo = {};
+    VkShaderModuleCreateInfo moduleInfo = { };
     moduleInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     moduleInfo.codeSize = len;
     moduleInfo.pCode = (uint32_t*)data;
@@ -1133,11 +1134,11 @@ void RenderPipeline::SetShader(const unsigned char* data, unsigned len) {
 }
 
 void RenderPipeline::Build() {
-    VkPushConstantRange pushConstantRange = {};
+    VkPushConstantRange pushConstantRange = { };
     pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     pushConstantRange.size = m_pushConstantSize;
 
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = { };
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &r->m_descriptorLayout;
@@ -1147,13 +1148,13 @@ void RenderPipeline::Build() {
     }
     VK_CHECK(vkCreatePipelineLayout(r->m_dev, &pipelineLayoutInfo, nullptr, &m_pipelineLayout));
 
-    VkSpecializationInfo specInfo = {};
+    VkSpecializationInfo specInfo = { };
     specInfo.mapEntryCount = m_constantEntries.size();
     specInfo.pMapEntries = m_constantEntries.data();
     specInfo.dataSize = m_constantSize;
     specInfo.pData = m_constant;
 
-    VkPipelineShaderStageCreateInfo stageInfo = {};
+    VkPipelineShaderStageCreateInfo stageInfo = { };
     stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     stageInfo.pName = "main";
@@ -1162,7 +1163,7 @@ void RenderPipeline::Build() {
         stageInfo.pSpecializationInfo = &specInfo;
     }
 
-    VkComputePipelineCreateInfo pipelineInfo = {};
+    VkComputePipelineCreateInfo pipelineInfo = { };
     pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     pipelineInfo.layout = m_pipelineLayout;
     pipelineInfo.stage = stageInfo;
@@ -1183,15 +1184,15 @@ void RenderPipeline::Render(VkImageView in, VkImageView out, VkRect2D outSize) {
         );
     }
 
-    VkDescriptorImageInfo descriptorImageInfoIn = {};
+    VkDescriptorImageInfo descriptorImageInfoIn = { };
     descriptorImageInfoIn.imageView = in;
     descriptorImageInfoIn.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    VkDescriptorImageInfo descriptorImageInfoOut = {};
+    VkDescriptorImageInfo descriptorImageInfoOut = { };
     descriptorImageInfoOut.imageView = out;
     descriptorImageInfoOut.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkWriteDescriptorSet descriptorWriteSets[2] = {};
+    VkWriteDescriptorSet descriptorWriteSets[2] = { };
     descriptorWriteSets[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWriteSets[0].descriptorCount = 1;
     descriptorWriteSets[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

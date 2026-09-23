@@ -345,8 +345,10 @@ pub fn entry_point(telemetry_base_dir: Option<PathBuf>) {
             preferred_encoding_gamma: 1.0,
             prefer_hdr: false,
         };
-        let core_context =
-            Arc::new(ClientCoreContext::new(capabilities, telemetry_base_dir.clone()));
+        let core_context = Arc::new(ClientCoreContext::new(
+            capabilities,
+            telemetry_base_dir.clone(),
+        ));
 
         let interaction_context = Arc::new(RwLock::new(InteractionContext::new(
             xr_session.clone(),

@@ -50,7 +50,7 @@ public:
 protected:
     AVCodecContext* encoder_ctx = nullptr; // shall be initialized by child class
     AVPacket* encoder_packet = NULL;
-    Timestamp timestamp = {};
+    Timestamp timestamp = { };
 };
 
 }

@@ -223,7 +223,8 @@ mod test {
 
     #[test]
     fn test_session_dir_pruning() {
-        let base_dir = std::env::temp_dir().join(format!("alvr_telemetry_test_{}", std::process::id()));
+        let base_dir =
+            std::env::temp_dir().join(format!("alvr_telemetry_test_{}", std::process::id()));
         fs::remove_dir_all(&base_dir).ok();
 
         let dir1 = TelemetryLogger::create_session_dir(&base_dir).unwrap();
@@ -234,25 +235,36 @@ mod test {
         for _ in 0..(DEFAULT_MAX_SESSIONS - 2) {
             TelemetryLogger::create_session_dir(&base_dir).unwrap();
         }
-        assert_eq!(fs::read_dir(&base_dir).unwrap().count(), DEFAULT_MAX_SESSIONS);
+        assert_eq!(
+            fs::read_dir(&base_dir).unwrap().count(),
+            DEFAULT_MAX_SESSIONS
+        );
 
         // Creating one more session must evict the oldest one
         TelemetryLogger::create_session_dir(&base_dir).unwrap();
-        assert_eq!(fs::read_dir(&base_dir).unwrap().count(), DEFAULT_MAX_SESSIONS);
+        assert_eq!(
+            fs::read_dir(&base_dir).unwrap().count(),
+            DEFAULT_MAX_SESSIONS
+        );
 
         fs::remove_dir_all(&base_dir).ok();
     }
 
     #[test]
     fn test_logging_and_rotation() {
-        let session_dir = std::env::temp_dir().join(format!("alvr_telemetry_rot_{}", std::process::id()));
+        let session_dir =
+            std::env::temp_dir().join(format!("alvr_telemetry_rot_{}", std::process::id()));
         fs::remove_dir_all(&session_dir).ok();
         fs::create_dir_all(&session_dir).ok();
 
         let max_file_size = 128;
-        let logger =
-            TelemetryLogger::start_impl(&session_dir, "test", r#"{"type":"header"}"#, max_file_size)
-                .unwrap();
+        let logger = TelemetryLogger::start_impl(
+            &session_dir,
+            "test",
+            r#"{"type":"header"}"#,
+            max_file_size,
+        )
+        .unwrap();
 
         // 63-byte rows: the second row does not fit in a 128-byte file, so rotation must kick in
         let row = format!("\"{}\"", "x".repeat(60));

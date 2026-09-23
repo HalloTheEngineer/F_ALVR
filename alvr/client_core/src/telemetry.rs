@@ -1,5 +1,5 @@
 use alvr_common::{
-    glam::Quat, parking_lot::Mutex, DeviceMotion, Pose, TelemetryLogger, unix_timestamp_ms,
+    DeviceMotion, Pose, TelemetryLogger, glam::Quat, parking_lot::Mutex, unix_timestamp_ms,
 };
 use alvr_packets::ClientStatistics;
 use alvr_session::Settings;
@@ -164,11 +164,8 @@ impl Default for ClientTelemetry {
 pub fn pose_residual(last_pose: &Pose, measured_pose: &Pose) -> (f32, f32) {
     let position_residual = last_pose.position.distance(measured_pose.position);
 
-    let orientation_residual = Quat::angle_between(
-        last_pose.orientation,
-        measured_pose.orientation,
-    )
-    .to_degrees();
+    let orientation_residual =
+        Quat::angle_between(last_pose.orientation, measured_pose.orientation).to_degrees();
 
     (position_residual, orientation_residual)
 }

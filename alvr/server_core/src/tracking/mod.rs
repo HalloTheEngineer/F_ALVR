@@ -13,9 +13,9 @@ use crate::{
     input_mapping::ButtonMappingManager,
 };
 use alvr_common::{
-    ConnectionError, DEVICE_ID_TO_PATH, DeviceMotion, Pose, ViewParams, unix_timestamp_ms,
+    ConnectionError, DEVICE_ID_TO_PATH, DeviceMotion, Pose, ViewParams,
     glam::{Quat, Vec3},
-    inputs as inp,
+    inputs as inp, unix_timestamp_ms,
 };
 use alvr_events::{EventType, TrackingEvent};
 use alvr_packets::TrackingData;
@@ -222,9 +222,7 @@ impl TrackingManager {
             return None;
         };
 
-        if sample_interpolation
-            && let Some((older_ts, older_motion)) = closest_older
-        {
+        if sample_interpolation && let Some((older_ts, older_motion)) = closest_older {
             return Some(interpolate_motion(
                 older_motion,
                 newer_motion,
@@ -248,8 +246,7 @@ impl TrackingManager {
         prediction_mode: PredictionMode,
         sample_interpolation: bool,
     ) -> Option<DeviceMotion> {
-        let motion =
-            self.get_device_motion(device_id, sample_timestamp, sample_interpolation)?;
+        let motion = self.get_device_motion(device_id, sample_timestamp, sample_interpolation)?;
 
         match prediction_mode {
             PredictionMode::Linear => Some(motion.predict(sample_timestamp, target_timestamp)),
@@ -263,7 +260,9 @@ impl TrackingManager {
                     return Some(motion.predict(sample_timestamp, target_timestamp));
                 };
 
-                let dt = sample_timestamp.saturating_sub(*prev_timestamp).as_secs_f32();
+                let dt = sample_timestamp
+                    .saturating_sub(*prev_timestamp)
+                    .as_secs_f32();
                 if dt <= 0.0 {
                     return Some(motion.predict(sample_timestamp, target_timestamp));
                 }
@@ -281,8 +280,7 @@ impl TrackingManager {
                     .as_secs_f32();
                 let half_delta_squared = 0.5 * delta_time_s * delta_time_s;
                 let delta_orientation = Quat::from_scaled_axis(
-                    motion.angular_velocity * delta_time_s
-                        + angular_accel * half_delta_squared,
+                    motion.angular_velocity * delta_time_s + angular_accel * half_delta_squared,
                 );
 
                 Some(DeviceMotion {
@@ -343,7 +341,9 @@ fn interpolate_motion(
     newer_timestamp: Duration,
     timestamp: Duration,
 ) -> DeviceMotion {
-    let total_s = newer_timestamp.saturating_sub(older_timestamp).as_secs_f32();
+    let total_s = newer_timestamp
+        .saturating_sub(older_timestamp)
+        .as_secs_f32();
     if total_s <= 0.0 {
         return *newer_motion;
     }
@@ -352,7 +352,10 @@ fn interpolate_motion(
 
     DeviceMotion {
         pose: Pose {
-            position: older_motion.pose.position.lerp(newer_motion.pose.position, alpha),
+            position: older_motion
+                .pose
+                .position
+                .lerp(newer_motion.pose.position, alpha),
             orientation: older_motion
                 .pose
                 .orientation
@@ -429,8 +432,8 @@ pub fn tracking_loop(
             let recv_instant = Instant::now();
             let interarrival_us = last_recv_instant
                 .map(|prev| recv_instant.saturating_duration_since(prev).as_micros());
-            let poll_delta_us = last_poll_timestamp
-                .map(|prev| timestamp.saturating_sub(prev).as_micros());
+            let poll_delta_us =
+                last_poll_timestamp.map(|prev| timestamp.saturating_sub(prev).as_micros());
             last_recv_instant = Some(recv_instant);
             last_poll_timestamp = Some(timestamp);
 
@@ -629,9 +632,9 @@ pub fn tracking_loop(
                 .map(move |id| {
                     (
                         *id,
-                            tracking_manager_lock
-                                .get_device_motion(*id, timestamp, false)
-                                .unwrap(),
+                        tracking_manager_lock
+                            .get_device_motion(*id, timestamp, false)
+                            .unwrap(),
                     )
                 })
                 .collect::<Vec<_>>();
