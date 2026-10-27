@@ -8,6 +8,8 @@ Usage:
     apply.py status
 
 - <profile_name> refers to tools/profiles/<name>.json or tools/profiles/experiments/<name>.json
+- On Windows, run this from the ALVR streamer folder (session.json sits next to ALVR Dashboard.exe)
+  or pass --config <path to session.json>
 - The first apply of a profile stores the previous values in
   <config_dir>/profile_backup_<name>.json, used by `revert`
 - --restart issues a SteamVR restart afterwards (needed for steamvr-restart flagged settings
@@ -23,11 +25,42 @@ import time
 import urllib.request
 from pathlib import Path
 
-if sys.platform == "win32":
-    CONFIG_PATH = Path(os.environ["APPDATA"]) / "alvr" / "session.json"
-else:
-    CONFIG_PATH = Path.home() / ".config" / "alvr" / "session.json"
 PROFILES_DIR = Path(__file__).parent
+CONFIG_PATH = None
+
+
+def resolve_config_path(explicit):
+    if explicit:
+        return Path(explicit)
+
+    candidates = []
+
+    env_dir = os.environ.get("ALVR_CONFIG_DIR")
+    if env_dir:
+        candidates.append(Path(env_dir) / "session.json")
+
+    # Windows installs (portable) keep session.json next to ALVR Dashboard.exe, so running the
+    # script from the streamer folder is the primary case
+    candidates.append(Path.cwd() / "session.json")
+
+    # Next to the script or in one of its parent folders
+    here = Path(__file__).resolve().parent
+    for _ in range(5):
+        candidates.append(here / "session.json")
+        here = here.parent
+
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            candidates.append(Path(appdata) / "alvr" / "session.json")
+    else:
+        candidates.append(Path.home() / ".config" / "alvr" / "session.json")
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    sys.exit("session.json not found; run from the ALVR streamer folder or pass --config <path>")
 
 
 def resolve_profile(name):
@@ -244,7 +277,11 @@ def main():
     parser.add_argument("--restart", action="store_true", default=True)
     parser.add_argument("--no-restart", dest="restart", action="store_false")
     parser.add_argument("--no-backup", action="store_true")
+    parser.add_argument("--config", default=None, help="path to session.json")
     args = parser.parse_args()
+
+    global CONFIG_PATH
+    CONFIG_PATH = resolve_config_path(args.config)
 
     if args.command == "status":
         status()
