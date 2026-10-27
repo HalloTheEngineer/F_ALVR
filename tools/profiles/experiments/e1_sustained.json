@@ -1,0 +1,11 @@
+{
+    "name": "e1_sustained",
+    "description": "E1: SustainedHigh CPU/GPU performance level (removes PowerSavings throttling)",
+    "steamvr_restart": false,
+    "values": [
+        {"path": ["session_settings", "headset", "performance_level", "cpu", "enabled"], "value": true},
+        {"path": ["session_settings", "headset", "performance_level", "cpu", "content", "variant"], "value": "SustainedHigh"},
+        {"path": ["session_settings", "headset", "performance_level", "gpu", "enabled"], "value": true},
+        {"path": ["session_settings", "headset", "performance_level", "gpu", "content", "variant"], "value": "SustainedHigh"}
+    ]
+}

@@ -1,0 +1,8 @@
+{
+    "name": "e5_90hz",
+    "description": "E5: 90 Hz refresh check",
+    "steamvr_restart": true,
+    "values": [
+        {"path": ["session_settings", "video", "preferred_fps"], "value": 90.0}
+    ]
+}

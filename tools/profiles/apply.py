@@ -7,7 +7,7 @@ Usage:
     apply.py revert
     apply.py status
 
-- <profile_name> refers to tools/profiles/<name>.json
+- <profile_name> refers to tools/profiles/<name>.json or tools/profiles/experiments/<name>.json
 - The first apply of a profile stores the previous values in
   <config_dir>/profile_backup_<name>.json, used by `revert`
 - --restart issues a SteamVR restart afterwards (needed for steamvr-restart flagged settings
@@ -17,6 +17,7 @@ Usage:
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 import urllib.request
@@ -27,6 +28,16 @@ if sys.platform == "win32":
 else:
     CONFIG_PATH = Path.home() / ".config" / "alvr" / "session.json"
 PROFILES_DIR = Path(__file__).parent
+
+
+def resolve_profile(name):
+    for candidate in (
+        PROFILES_DIR / f"{name}.json",
+        PROFILES_DIR / "experiments" / f"{name}.json",
+    ):
+        if candidate.exists():
+            return candidate
+    sys.exit(f"Profile not found: {name}")
 
 
 def load_session():
@@ -56,13 +67,6 @@ def get_value(session, path):
     return ref
 
 
-def set_value(session, path, value):
-    ref = session["session_settings"]
-    for segment in path[:-1]:
-        ref = ref[segment]
-    ref[path[-1]] = value
-
-
 def wait_for_server(port, timeout_s=30):
     deadline = time.time() + timeout_s
     while time.time() < deadline:
@@ -74,12 +78,53 @@ def wait_for_server(port, timeout_s=30):
     return False
 
 
+def find_windows_vrmonitor():
+    candidates = []
+    try:
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as key:
+            steam_path = Path(winreg.QueryValueEx(key, "SteamPath")[0])
+            candidates.append(
+                steam_path / "steamapps/common/SteamVR/bin/win64/vrmonitor.exe"
+            )
+    except OSError:
+        pass
+
+    for base in (
+        r"C:\Program Files (x86)\Steam",
+        r"C:\Program Files\Steam",
+        r"D:\Steam",
+        r"E:\Steam",
+    ):
+        candidates.append(
+            Path(base) / "steamapps/common/SteamVR/bin/win64/vrmonitor.exe"
+        )
+
+    return next((candidate for candidate in candidates if candidate.exists()), None)
+
+
 def restart_steamvr(port):
     # NOTE: the /api/steamvr/restart endpoint restarts SteamVR without rescanning external
-    # drivers (the ALVR driver does not load again). A full process restart is required on Linux.
-    import subprocess
-
+    # drivers (the ALVR driver does not load again). A full process restart is required.
     print("Restarting SteamVR (full process restart)...")
+
+    if sys.platform == "win32":
+        subprocess.run(["taskkill", "/IM", "vrserver.exe", "/F"], capture_output=True)
+        subprocess.run(["taskkill", "/IM", "vrmonitor.exe", "/F"], capture_output=True)
+        time.sleep(4)
+
+        vrmonitor = find_windows_vrmonitor()
+        if vrmonitor is not None:
+            subprocess.Popen([str(vrmonitor)], close_fds=True)
+        else:
+            print("WARNING: vrmonitor.exe not found, requesting SteamVR via Steam")
+            os.startfile("steam://rungameid/250820")  # noqa: S606
+
+        wait_for_server(port, timeout_s=60)
+        print("SteamVR restarted")
+        return
+
     subprocess.run(["pkill", "-f", "vrmonitor"], check=False)
     subprocess.run(["pkill", "-f", "vrserver"], check=False)
     time.sleep(4)
@@ -103,18 +148,21 @@ def restart_steamvr(port):
 
 
 def apply(profile_name, do_restart, backup=True):
-    profile_path = PROFILES_DIR / f"{profile_name}.json"
+    profile_path = resolve_profile(profile_name)
     profile = json.loads(profile_path.read_text())
     session = load_session()
     port = api_port(session)
 
-    backup_path = CONFIG_PATH.parent / f"profile_backup_{profile_name}.json"
+    safe_name = profile_name.replace("/", "_")
+    backup_path = CONFIG_PATH.parent / f"profile_backup_{safe_name}.json"
     if backup and not backup_path.exists():
         original_values = [
             {"path": desc["path"], "value": get_value(session, desc["path"])}
             for desc in profile["values"]
         ]
-        backup_path.write_text(json.dumps({"profile": profile_name, "values": original_values}, indent=1))
+        backup_path.write_text(
+            json.dumps({"profile": profile_name, "values": original_values}, indent=1)
+        )
         print(f"Backup written: {backup_path}")
     elif backup_path.exists():
         print(f"Backup already exists, keeping it: {backup_path}")
@@ -151,7 +199,8 @@ def apply(profile_name, do_restart, backup=True):
 
 
 def revert(profile_name):
-    backup_path = CONFIG_PATH.parent / f"profile_backup_{profile_name}.json"
+    safe_name = profile_name.replace("/", "_")
+    backup_path = CONFIG_PATH.parent / f"profile_backup_{safe_name}.json"
     if not backup_path.exists():
         sys.exit(f"No backup found for profile '{profile_name}'")
 
@@ -166,10 +215,10 @@ def revert(profile_name):
     status = api_post(port, "session/values", payload)
     print(f"Reverted {len(payload)} values ({profile_name}) -> HTTP {status}")
 
-    if (PROFILES_DIR / f"{profile_name}.json").exists():
-        profile = json.loads((PROFILES_DIR / f"{profile_name}.json").read_text())
-        if profile.get("steamvr_restart"):
-            restart_steamvr(port)
+    profile_path = resolve_profile(profile_name)
+    profile = json.loads(profile_path.read_text())
+    if profile.get("steamvr_restart"):
+        restart_steamvr(port)
 
     backup_path.unlink()
     print("Backup removed")
@@ -184,6 +233,8 @@ def status():
         print(f"Active backup: {backup.name}")
     for profile in sorted(PROFILES_DIR.glob("*.json")):
         print(f"Profile: {profile.stem}")
+    for profile in sorted((PROFILES_DIR / "experiments").glob("*.json")):
+        print(f"Profile: experiments/{profile.stem}")
 
 
 def main():

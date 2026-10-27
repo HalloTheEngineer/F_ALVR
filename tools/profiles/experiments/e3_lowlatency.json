@@ -1,0 +1,13 @@
+{
+    "name": "e3_lowlatency",
+    "description": "E3: add the standard Android 'low-latency' MediaCodec key (keeps existing keys)",
+    "steamvr_restart": true,
+    "values": [
+        {"path": ["session_settings", "video", "mediacodec_extra_options", "content"], "value": [
+            ["operating-rate", {"ty": {"variant": "Int32"}, "value": "2147483647"}],
+            ["priority", {"ty": {"variant": "Int32"}, "value": "0"}],
+            ["vendor.qti-ext-dec-low-latency.enable", {"ty": {"variant": "Int32"}, "value": "1"}],
+            ["low-latency", {"ty": {"variant": "Int32"}, "value": "1"}]
+        ]}
+    ]
+}

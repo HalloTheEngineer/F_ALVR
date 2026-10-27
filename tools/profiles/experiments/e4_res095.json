@@ -1,0 +1,11 @@
+{
+    "name": "e4_res095",
+    "description": "E4: render/encode scale 0.95",
+    "steamvr_restart": true,
+    "values": [
+        {"path": ["session_settings", "video", "transcoding_view_resolution", "variant"], "value": "Scale"},
+        {"path": ["session_settings", "video", "transcoding_view_resolution", "Scale"], "value": 0.95},
+        {"path": ["session_settings", "video", "emulated_headset_view_resolution", "variant"], "value": "Scale"},
+        {"path": ["session_settings", "video", "emulated_headset_view_resolution", "Scale"], "value": 0.95}
+    ]
+}

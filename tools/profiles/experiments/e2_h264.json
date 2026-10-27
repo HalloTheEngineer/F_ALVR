@@ -1,0 +1,8 @@
+{
+    "name": "e2_h264",
+    "description": "E2: H.264 codec (expect ~3 ms less decode than AV1 on Quest 3)",
+    "steamvr_restart": true,
+    "values": [
+        {"path": ["session_settings", "video", "preferred_codec", "variant"], "value": "H264"}
+    ]
+}

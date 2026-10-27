@@ -1,0 +1,10 @@
+{
+    "name": "e6_foveation",
+    "description": "E6: client-side foveation, static High (saves Quest GPU)",
+    "steamvr_restart": true,
+    "values": [
+        {"path": ["session_settings", "video", "clientside_foveation", "enabled"], "value": true},
+        {"path": ["session_settings", "video", "clientside_foveation", "content", "mode", "variant"], "value": "Static"},
+        {"path": ["session_settings", "video", "clientside_foveation", "content", "mode", "Static", "level", "variant"], "value": "High"}
+    ]
+}

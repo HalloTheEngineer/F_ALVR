@@ -1,0 +1,8 @@
+{
+    "name": "e2_hevc",
+    "description": "E2: HEVC codec (middle ground between H.264 latency and AV1 quality)",
+    "steamvr_restart": true,
+    "values": [
+        {"path": ["session_settings", "video", "preferred_codec", "variant"], "value": "Hevc"}
+    ]
+}
