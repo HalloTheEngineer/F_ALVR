@@ -124,7 +124,9 @@ jobs:
         run: cargo test -p alvr_session
 
   check-format:
-    runs-on: ubuntu-latest
+    # Pin the runner: newer Ubuntu images ship a newer clang-format which reformats the whole
+    # C++ codebase differently
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
