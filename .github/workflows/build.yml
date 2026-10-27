@@ -29,9 +29,9 @@ jobs:
           RUST_BACKTRACE: 1
         run: |
           mkdir artifacts/
-          cargo xtask build-streamer --platform windows --ci
+          cargo xtask build-streamer --platform windows --ci --release
           zip -r9X artifacts/alvr_streamer_windows.zip ./build/alvr_streamer*
-          cargo xtask build-launcher --platform windows --ci
+          cargo xtask build-launcher --platform windows --ci --release
           zip -r9X artifacts/alvr_launcher_windows.zip ./build/alvr_launcher*
 
       - name: Upload artifacts
@@ -64,9 +64,9 @@ jobs:
         run: |
           set -e
           mkdir artifacts/
-          cargo xtask build-streamer --platform linux --ci
+          cargo xtask build-streamer --platform linux --ci --release
           tar -cJf artifacts/alvr_streamer_linux.tar.xz ./build/alvr_streamer*
-          cargo xtask build-launcher --platform linux --ci
+          cargo xtask build-launcher --platform linux --ci --release
           tar -cJf artifacts/alvr_launcher_linux.tar.xz ./build/alvr_launcher*
 
       - name: Upload artifacts

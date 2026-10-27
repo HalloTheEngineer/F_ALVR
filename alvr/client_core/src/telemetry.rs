@@ -49,6 +49,24 @@ impl ClientTelemetry {
                 "fps": fps,
                 "wired": wired,
                 "max_prediction_ms": settings.headset.max_prediction_ms,
+                "input_poll_divisor": settings
+                    .headset
+                    .controllers
+                    .as_option()
+                    .map(|config| config.input_poll_divisor),
+                "prediction_mode": settings
+                    .headset
+                    .controllers
+                    .as_option()
+                    .map(|config| match config.prediction_mode {
+                        alvr_session::PredictionMode::Linear => "linear",
+                        alvr_session::PredictionMode::Quadratic => "quadratic",
+                    }),
+                "sample_interpolation": settings
+                    .headset
+                    .controllers
+                    .as_option()
+                    .map(|config| config.sample_interpolation),
                 "steamvr_pipeline_frames": settings
                     .headset
                     .controllers

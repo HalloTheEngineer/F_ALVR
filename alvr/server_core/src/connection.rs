@@ -27,7 +27,7 @@ use alvr_packets::{
 };
 use alvr_session::{
     BitrateMode, BodyTrackingSinkConfig, CodecType, ControllersEmulationMode, FrameSize,
-    H264Profile, Settings, SocketProtocol, SteamvrHmdInitConfig,
+    H264Profile, PredictionMode, Settings, SocketProtocol, SteamvrHmdInitConfig,
 };
 use alvr_sockets::{
     CONTROL_PORT, KEEPALIVE_INTERVAL, KEEPALIVE_TIMEOUT, ProtoControlSocket, SocketConnection,
@@ -87,9 +87,17 @@ fn create_telemetry_logger(
     fps: f32,
     codec: CodecType,
     eye_resolution: UVec2,
+    wired: bool,
 ) -> Option<Arc<TelemetryLogger>> {
     let base_dir = FILESYSTEM_LAYOUT.get()?.log_dir.join("alvr_telemetry");
     let session_dir = TelemetryLogger::create_session_dir(&base_dir)?;
+
+    // Wired connections always use TCP, regardless of the configured protocol
+    let stream_protocol = if wired {
+        "tcp".to_owned()
+    } else {
+        telemetry_stream_protocol_string(&settings.connection.stream_protocol)
+    };
 
     let header = json!({
         "type": "header",
@@ -99,9 +107,28 @@ fn create_telemetry_logger(
         "settings": {
             "codec": format!("{codec:?}"),
             "fps": fps,
-            "stream_protocol": telemetry_stream_protocol_string(&settings.connection.stream_protocol),
+            "stream_protocol": stream_protocol,
+            "wired": wired,
             "bitrate_mode": telemetry_bitrate_mode_string(&settings.video.bitrate.mode),
             "max_prediction_ms": settings.headset.max_prediction_ms,
+            "input_poll_divisor": settings
+                .headset
+                .controllers
+                .as_option()
+                .map(|config| config.input_poll_divisor),
+            "prediction_mode": settings
+                .headset
+                .controllers
+                .as_option()
+                .map(|config| match config.prediction_mode {
+                    PredictionMode::Linear => "linear",
+                    PredictionMode::Quadratic => "quadratic",
+                }),
+            "sample_interpolation": settings
+                .headset
+                .controllers
+                .as_option()
+                .map(|config| config.sample_interpolation),
             "steamvr_pipeline_frames": settings
                 .headset
                 .controllers
@@ -1501,9 +1528,13 @@ fn connection_pipeline(
         ClientConnectionsAction::SetConnectionState(ConnectionState::Streaming),
     );
 
-    if let Some(logger) =
-        create_telemetry_logger(&initial_settings, fps, codec, transcoding_view_resolution)
-    {
+    if let Some(logger) = create_telemetry_logger(
+        &initial_settings,
+        fps,
+        codec,
+        transcoding_view_resolution,
+        client_ip.is_loopback(),
+    ) {
         *ctx.telemetry_logger.lock() = Some(Arc::clone(&logger));
     } else {
         warn!("Failed to create telemetry logger");
