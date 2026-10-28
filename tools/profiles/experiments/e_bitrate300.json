@@ -1,0 +1,20 @@
+{
+    "name": "e_bitrate300",
+    "description": "Session A: constant bitrate 300 Mbps (vs 100 baseline)",
+    "steamvr_restart": false,
+    "values": [
+        {"path": ["session_settings", "video", "bitrate", "mode"], "value": {
+            "ConstantMbps": 300,
+            "Adaptive": {
+                "gui_collapsed": true,
+                "saturation_multiplier": 0.95,
+                "max_throughput_mbps": {"enabled": false, "content": 100},
+                "min_throughput_mbps": {"enabled": false, "content": 5},
+                "max_network_latency_ms": {"enabled": false, "content": 8},
+                "encoder_latency_limiter": {"enabled": true, "content": {"max_saturation_multiplier": 0.9}},
+                "decoder_latency_limiter": {"enabled": true, "content": {"gui_collapsed": false, "max_decoder_latency_ms": 30, "latency_overstep_frames": 90, "latency_overstep_multiplier": 0.99}}
+            },
+            "variant": "ConstantMbps"
+        }}
+    ]
+}

@@ -1,0 +1,112 @@
+ALVR LATENCY EXPERIMENTS - RUNBOOK (dual boot)
+===============================================
+
+Goal: reduce end-to-end latency for Beat Saber, prioritizing consistency (p99 /
+frame spikes). All experiments run on Windows; telemetry is collected into this
+folder so it can be analyzed after rebooting to Linux.
+
+Baseline (measured 27 Oct, AV1 120 Hz, USB, PowerSavings):
+  p50 39.2 ms | p95 45.3 ms | p99 48.8 ms | spikes 0.76%
+  decode 6.6 ms | decoder queue 4.2 ms | vsync queue 15.3 ms | encode 3.8 ms | net 0.9 ms
+
+
+PREREQUISITES
+-------------
+1. Latest release streamer in this folder (ALVR Dashboard.exe + session.json).
+2. Latest APK sideloaded on the Quest 3.
+3. Quest 3 charged to 100%.
+4. Python 3 on PATH (check: python --version).
+5. ONE fixed Beat Saber map you can play consistently. Same map for every run.
+6. ALVR Dashboard running, Quest connected, SteamVR running, map ready.
+
+All commands below are run from THIS folder (cmd or PowerShell):
+
+    cd /d "<this folder>"
+
+
+SESSION A - LIVE FACTORS (about 18 minutes, one continuous block)
+-----------------------------------------------------------------
+Start the scripted sequence:
+
+    python tools\profiles\apply.py sequence tools\profiles\schedules\session_a.json
+
+Then put the headset on and play the fixed map CONTINUOUSLY. You will hear
+beeps when the next stage starts (double beep) and ends (single beep). Stages:
+
+  1. baseline, SustainedHigh (kept afterwards)   2.5 min
+  2. steamvr_pipeline_frames 2.0                 2.5 min
+  3. bitrate 300 Mbps                            2.5 min
+  4. PowerSavings performance level              2.5 min
+  5. input poll divisor 3                        2.5 min
+  6. sample interpolation off                    2.5 min
+  7. baseline repeat                             2.5 min
+
+Do not stop playing between beeps; the script changes settings automatically.
+When it finishes:
+
+    powershell -ExecutionPolicy Bypass -File collect.ps1
+
+
+SESSION B - RESTART FACTORS (about 15 minutes)
+---------------------------------------------
+One command per configuration (SteamVR restarts automatically, ~1 minute).
+After each restart: reconnect the Quest if needed, start the map, play 2.5 minutes.
+
+    python tools\profiles\apply.py apply experiments/e2_h264
+    python tools\profiles\apply.py revert experiments/e2_h264
+
+    python tools\profiles\apply.py apply experiments/e2_hevc
+    python tools\profiles\apply.py revert experiments/e2_hevc
+
+    (keep the better codec, then:)
+    python tools\profiles\apply.py apply experiments/e4_res095
+    python tools\profiles\apply.py revert experiments/e4_res095
+
+    python tools\profiles\apply.py apply experiments/e4_res090
+    python tools\profiles\apply.py revert experiments/e4_res090
+
+    python tools\profiles\apply.py apply experiments/e5_90hz
+    python tools\profiles\apply.py revert experiments/e5_90hz
+
+After the last configuration:
+
+    powershell -ExecutionPolicy Bypass -File collect.ps1
+
+
+RULES
+-----
+- One experiment at a time in Session B; revert before the next.
+- Keep the SustainedHigh performance level (Session A leaves it applied).
+- Stop rule: when two consecutive steps improve p99 by less than 1 ms, we stop.
+- Do NOT enable Quadratic prediction: it is broken (controllers start
+  misbehaving). Known issue, to be fixed separately.
+
+
+TROUBLESHOOTING
+---------------
+"ALVR server not reachable"
+    Start ALVR Dashboard and SteamVR, then run the command again.
+
+"session.json not found"
+    Run the commands from this folder, or pass --config "C:\path\to\session.json".
+
+"python is not recognized"
+    Install Python 3 from python.org with "Add python.exe to PATH".
+
+Values "did not stick"
+    The server was not fully up yet. Wait for SteamVR to finish starting and retry.
+
+SteamVR did not come back after a restarting step
+    Start SteamVR from the ALVR Dashboard, then continue. The backup file
+    profile_backup_<profile>.json next to session.json is kept for reverting.
+
+
+COLLECTION
+----------
+collect.ps1 pulls only NEW Quest session folders over adb and copies new server
+session folders into captures\<timestamp>\client and captures\<timestamp>\server.
+It also tracks what was already collected in captures\.collected.txt.
+
+After collecting, reboot to Linux; the assistant analyzes the captures and
+reports p50/p95/p99, frame spikes, decode, decoder queue, vsync queue, encoder
+and network latency per stage/configuration, then says KEEP or REVERT.

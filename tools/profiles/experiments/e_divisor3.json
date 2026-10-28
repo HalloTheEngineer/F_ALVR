@@ -1,0 +1,8 @@
+{
+    "name": "e_divisor3",
+    "description": "Session A: input poll divisor 3 (vs 6 baseline)",
+    "steamvr_restart": false,
+    "values": [
+        {"path": ["session_settings", "headset", "controllers", "content", "input_poll_divisor"], "value": 3}
+    ]
+}

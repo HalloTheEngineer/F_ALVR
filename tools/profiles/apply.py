@@ -22,6 +22,7 @@ import os
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -208,7 +209,12 @@ def apply(profile_name, do_restart, backup=True):
         for desc in profile["values"]
     ]
 
-    status = api_post(port, "session/values", payload)
+    try:
+        status = api_post(port, "session/values", payload)
+    except (urllib.error.URLError, ConnectionError) as e:
+        print(f"ERROR: ALVR server not reachable on port {port} ({e}).")
+        print("Start ALVR Dashboard and SteamVR, then try again.")
+        return False
     print(f"Applied {len(payload)} values ({profile_name}) -> HTTP {status}")
 
     # verify against the persisted session
@@ -230,6 +236,8 @@ def apply(profile_name, do_restart, backup=True):
     if do_restart and profile.get("steamvr_restart"):
         restart_steamvr(port)
 
+    return not mismatches
+
 
 def revert(profile_name):
     safe_name = profile_name.replace("/", "_")
@@ -245,7 +253,10 @@ def revert(profile_name):
         {"path": [{"Name": segment} for segment in desc["path"]], "value": desc["value"]}
         for desc in backup["values"]
     ]
-    status = api_post(port, "session/values", payload)
+    try:
+        status = api_post(port, "session/values", payload)
+    except (urllib.error.URLError, ConnectionError) as e:
+        sys.exit(f"ERROR: ALVR server not reachable on port {port} ({e})")
     print(f"Reverted {len(payload)} values ({profile_name}) -> HTTP {status}")
 
     profile_path = resolve_profile(profile_name)
@@ -255,6 +266,99 @@ def revert(profile_name):
 
     backup_path.unlink()
     print("Backup removed")
+
+    return True
+
+
+def beep(times=1):
+    if sys.platform != "win32":
+        return
+    try:
+        import winsound
+
+        for _ in range(times):
+            winsound.Beep(880, 180)
+            time.sleep(0.05)
+    except Exception:
+        pass
+
+
+def unix_ms():
+    return int(time.time() * 1000)
+
+
+def sequence(schedule_path, out_dir=None):
+    schedule = json.loads(Path(schedule_path).read_text())
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    out = Path(out_dir) if out_dir else Path.cwd() / "captures" / stamp
+    out.mkdir(parents=True, exist_ok=True)
+    schedule_log_path = out / "schedule.json"
+
+    log = {
+        "schedule": str(schedule_path),
+        "started_unix_ms": unix_ms(),
+        "stages": [],
+    }
+
+    def write_log():
+        schedule_log_path.write_text(json.dumps(log, indent=1))
+
+    print(f"Session output: {out}")
+    print(f"Stages: {len(schedule['stages'])}")
+    print("Keep the headset on and play the fixed map continuously.")
+
+    aborted = False
+    for index, stage in enumerate(schedule["stages"]):
+        label = stage.get("label", stage.get("profile") or f"stage{index + 1}")
+        profile = stage.get("profile")
+        duration = int(stage["duration_s"])
+        record = {
+            "index": index,
+            "label": label,
+            "profile": profile,
+            "duration_s": duration,
+            "apply_unix_ms": unix_ms(),
+        }
+
+        if profile:
+            profile_data = json.loads(resolve_profile(profile).read_text())
+            if profile_data.get("steamvr_restart") and not stage.get("allow_restart"):
+                record["error"] = "profile requires a SteamVR restart; use Session B manually"
+                log["stages"].append(record)
+                write_log()
+                print(f"ERROR: {record['error']}")
+                aborted = True
+                break
+
+            print(f"\n=== Stage {index + 1}/{len(schedule['stages'])}: {label} ({profile}) ===")
+            beep(2)
+            if not apply(profile, do_restart=False):
+                record["error"] = "values did not stick"
+                log["stages"].append(record)
+                write_log()
+                print("ERROR: stage aborted because values did not stick")
+                aborted = True
+                break
+        else:
+            print(f"\n=== Stage {index + 1}/{len(schedule['stages'])}: {label} ===")
+            beep(2)
+
+        print(f"Play for {duration} seconds...")
+        time.sleep(duration)
+
+        record["end_unix_ms"] = unix_ms()
+        if profile and not stage.get("keep"):
+            revert(profile)
+        beep(1)
+
+        log["stages"].append(record)
+        write_log()
+
+    log["finished_unix_ms"] = unix_ms()
+    write_log()
+
+    print(f"\nSequence {'aborted' if aborted else 'finished'}. Schedule: {schedule_log_path}")
+    print("Run collect.ps1 to save the telemetry.")
 
 
 def status():
@@ -278,6 +382,7 @@ def main():
     parser.add_argument("--no-restart", dest="restart", action="store_false")
     parser.add_argument("--no-backup", action="store_true")
     parser.add_argument("--config", default=None, help="path to session.json")
+    parser.add_argument("--out", default=None, help="sequence output directory")
     args = parser.parse_args()
 
     global CONFIG_PATH
@@ -291,6 +396,10 @@ def main():
         if not args.profile:
             sys.exit("apply requires a profile name")
         apply(args.profile, args.restart, not args.no_backup)
+    elif args.command == "sequence":
+        if not args.profile:
+            sys.exit("sequence requires a schedule file")
+        sequence(args.profile, args.out)
     else:
         sys.exit(f"Unknown command: {args.command}")
 

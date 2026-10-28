@@ -1,0 +1,8 @@
+{
+    "name": "e_pipeline20",
+    "description": "Session A: steamvr_pipeline_frames 2.0 (vs 1.0 baseline)",
+    "steamvr_restart": false,
+    "values": [
+        {"path": ["session_settings", "headset", "controllers", "content", "steamvr_pipeline_frames"], "value": 2.0}
+    ]
+}

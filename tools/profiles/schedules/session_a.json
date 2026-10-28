@@ -1,0 +1,13 @@
+{
+    "name": "session_a",
+    "description": "Live-factor latency session: baseline, pipeline frames, bitrate, performance level, poll divisor, interpolation, baseline repeat",
+    "stages": [
+        {"label": "baseline (sustained)", "profile": "experiments/e1_sustained", "duration_s": 150, "keep": true},
+        {"label": "pipeline_frames 2.0", "profile": "experiments/e_pipeline20", "duration_s": 150},
+        {"label": "bitrate 300", "profile": "experiments/e_bitrate300", "duration_s": 150},
+        {"label": "powersavings", "profile": "experiments/e_powersavings", "duration_s": 150},
+        {"label": "divisor 3", "profile": "experiments/e_divisor3", "duration_s": 150},
+        {"label": "interp off", "profile": "experiments/e_interp_off", "duration_s": 150},
+        {"label": "baseline repeat", "duration_s": 150}
+    ]
+}

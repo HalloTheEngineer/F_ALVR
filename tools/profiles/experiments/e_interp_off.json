@@ -1,0 +1,8 @@
+{
+    "name": "e_interp_off",
+    "description": "Session A: disable sample interpolation (feel check)",
+    "steamvr_restart": false,
+    "values": [
+        {"path": ["session_settings", "headset", "controllers", "content", "sample_interpolation"], "value": false}
+    ]
+}

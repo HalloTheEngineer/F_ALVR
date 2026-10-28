@@ -1,0 +1,9 @@
+{
+    "name": "e_powersavings",
+    "description": "Session A: PowerSavings performance level (quantifies SustainedHigh gain)",
+    "steamvr_restart": false,
+    "values": [
+        {"path": ["session_settings", "headset", "performance_level", "cpu", "content", "variant"], "value": "PowerSavings"},
+        {"path": ["session_settings", "headset", "performance_level", "gpu", "content", "variant"], "value": "PowerSavings"}
+    ]
+}
