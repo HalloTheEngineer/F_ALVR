@@ -1210,6 +1210,10 @@ Currently this cannot be reliably estimated automatically. The correct value sho
     pub steamvr_pipeline_frames: f32,
 
     #[schema(flag = "real-time")]
+    #[schema(strings(
+        help = r"Linear extrapolates with the measured velocity. Quadratic also uses the
+acceleration estimated over the last 20 ms; it can reduce swing lag but may feel less stable."
+    ))]
     pub prediction_mode: PredictionMode,
 
     #[schema(strings(

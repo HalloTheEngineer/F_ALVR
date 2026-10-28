@@ -248,53 +248,25 @@ impl TrackingManager {
         match prediction_mode {
             PredictionMode::Linear => Some(motion.predict(sample_timestamp, target_timestamp)),
             PredictionMode::Quadratic => {
-                // Closest sample older than sample_timestamp, to estimate the acceleration. If it
-                // does not exist, fall back to linear prediction.
                 let motions = self.device_motions_history.get(&device_id)?;
-                let Some((prev_timestamp, prev_motion)) =
-                    motions.iter().find(|(ts, _)| *ts < sample_timestamp)
+
+                let Some((reference_timestamp, reference_motion)) =
+                    find_acceleration_reference(motions, sample_timestamp)
                 else {
                     return Some(motion.predict(sample_timestamp, target_timestamp));
                 };
 
-                let dt = sample_timestamp
-                    .saturating_sub(*prev_timestamp)
+                let reference_dt_s = sample_timestamp
+                    .saturating_sub(reference_timestamp)
                     .as_secs_f32();
-                if dt <= 0.0 {
-                    return Some(motion.predict(sample_timestamp, target_timestamp));
-                }
-
-                const MAX_ANGULAR_ACCEL: f32 = 200.0; // rad/s²
-                const MAX_LINEAR_ACCEL: f32 = 200.0; // m/s²
-                let angular_accel = ((motion.angular_velocity - prev_motion.angular_velocity) / dt)
-                    .clamp(
-                        Vec3::splat(-MAX_ANGULAR_ACCEL),
-                        Vec3::splat(MAX_ANGULAR_ACCEL),
-                    );
-                let linear_accel = ((motion.linear_velocity - prev_motion.linear_velocity) / dt)
-                    .clamp(
-                        Vec3::splat(-MAX_LINEAR_ACCEL),
-                        Vec3::splat(MAX_LINEAR_ACCEL),
-                    );
-
                 let delta_time_s = target_timestamp
                     .saturating_sub(sample_timestamp)
                     .as_secs_f32();
-                let half_delta_squared = 0.5 * delta_time_s * delta_time_s;
-                let delta_orientation = Quat::from_scaled_axis(
-                    motion.angular_velocity * delta_time_s + angular_accel * half_delta_squared,
-                );
 
-                Some(DeviceMotion {
-                    pose: Pose {
-                        orientation: delta_orientation * motion.pose.orientation,
-                        position: motion.pose.position
-                            + motion.linear_velocity * delta_time_s
-                            + linear_accel * half_delta_squared,
-                    },
-                    linear_velocity: motion.linear_velocity + linear_accel * delta_time_s,
-                    angular_velocity: motion.angular_velocity + angular_accel * delta_time_s,
-                })
+                Some(
+                    quadratic_predict(&motion, &reference_motion, reference_dt_s, delta_time_s)
+                        .unwrap_or_else(|| motion.predict(sample_timestamp, target_timestamp)),
+                )
             }
         }
     }
@@ -370,6 +342,74 @@ fn interpolate_motion(
             .angular_velocity
             .lerp(newer_motion.angular_velocity, alpha),
     }
+}
+
+// Acceleration for the quadratic predictor is estimated over a window long enough that velocity
+// noise does not dominate the estimate.
+const ACCEL_WINDOW: Duration = Duration::from_millis(20);
+const MIN_ACCEL_BASELINE: Duration = Duration::from_millis(4);
+const MAX_ANGULAR_ACCEL: f32 = 200.0; // rad/s²
+const MAX_LINEAR_ACCEL: f32 = 200.0; // m/s²
+
+// Picks the sample closest to (but not newer than) sample_timestamp - ACCEL_WINDOW. The history
+// is ordered from most recent to oldest. Without enough history, falls back to the oldest sample.
+fn find_acceleration_reference(
+    motions: &VecDeque<(Duration, DeviceMotion)>,
+    sample_timestamp: Duration,
+) -> Option<(Duration, DeviceMotion)> {
+    let cutoff = sample_timestamp.saturating_sub(ACCEL_WINDOW);
+
+    if let Some((timestamp, motion)) = motions.iter().find(|(timestamp, _)| *timestamp <= cutoff) {
+        return Some((*timestamp, *motion));
+    }
+
+    motions
+        .back()
+        .filter(|(timestamp, _)| *timestamp < sample_timestamp)
+        .map(|(timestamp, motion)| (*timestamp, *motion))
+}
+
+// Extrapolates the motion from sample_timestamp to target_timestamp, adding the quadratic term
+// 0.5 * acceleration * dt^2 estimated against reference_motion. Returns None when the reference
+// baseline is too short to give a meaningful acceleration.
+fn quadratic_predict(
+    motion: &DeviceMotion,
+    reference_motion: &DeviceMotion,
+    reference_dt_s: f32,
+    delta_time_s: f32,
+) -> Option<DeviceMotion> {
+    if reference_dt_s < MIN_ACCEL_BASELINE.as_secs_f32() || delta_time_s <= 0.0 {
+        return None;
+    }
+
+    let angular_accel =
+        ((motion.angular_velocity - reference_motion.angular_velocity) / reference_dt_s).clamp(
+            Vec3::splat(-MAX_ANGULAR_ACCEL),
+            Vec3::splat(MAX_ANGULAR_ACCEL),
+        );
+    let linear_accel =
+        ((motion.linear_velocity - reference_motion.linear_velocity) / reference_dt_s).clamp(
+            Vec3::splat(-MAX_LINEAR_ACCEL),
+            Vec3::splat(MAX_LINEAR_ACCEL),
+        );
+
+    let half_delta_squared = 0.5 * delta_time_s * delta_time_s;
+    let delta_orientation = Quat::from_scaled_axis(
+        motion.angular_velocity * delta_time_s + angular_accel * half_delta_squared,
+    );
+
+    Some(DeviceMotion {
+        pose: Pose {
+            orientation: delta_orientation * motion.pose.orientation,
+            position: motion.pose.position
+                + motion.linear_velocity * delta_time_s
+                + linear_accel * half_delta_squared,
+        },
+        // Keep the measured velocities: SteamVR extrapolates the submitted pose using them, so
+        // adding the acceleration term here would count it twice.
+        linear_velocity: motion.linear_velocity,
+        angular_velocity: motion.angular_velocity,
+    })
 }
 
 pub fn tracking_loop(
@@ -699,5 +739,104 @@ pub fn tracking_loop(
                 .collect::<Vec<_>>();
             sink.send_tracking(&device_motions);
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn motion_with_velocity(angular_velocity: Vec3, linear_velocity: Vec3) -> DeviceMotion {
+        DeviceMotion {
+            pose: Pose {
+                position: Vec3::new(1.0, 2.0, 0.5),
+                orientation: Quat::from_rotation_y(0.3),
+            },
+            linear_velocity,
+            angular_velocity,
+        }
+    }
+
+    #[test]
+    fn quadratic_matches_linear_without_acceleration() {
+        let motion = motion_with_velocity(Vec3::new(1.0, -2.0, 0.5), Vec3::new(0.1, 0.0, -0.2));
+        let quadratic = quadratic_predict(&motion, &motion, 0.02, 0.03).unwrap();
+        let linear = motion.predict(Duration::ZERO, Duration::from_secs_f32(0.03));
+
+        assert!((quadratic.pose.position - linear.pose.position).length() < 1e-6);
+        assert!(
+            (quadratic.pose.orientation.to_scaled_axis()
+                - linear.pose.orientation.to_scaled_axis())
+            .length()
+                < 1e-6
+        );
+    }
+
+    #[test]
+    fn quadratic_adds_half_a_t_squared() {
+        let motion = motion_with_velocity(Vec3::new(0.0, 4.0, 0.0), Vec3::new(2.0, 0.0, 0.0));
+        let reference = motion_with_velocity(Vec3::ZERO, Vec3::ZERO);
+        let reference_dt = 0.02;
+        let delta = 0.1;
+
+        let result = quadratic_predict(&motion, &reference, reference_dt, delta).unwrap();
+
+        // angular accel = 4 / 0.02 = 200 rad/s² (exactly the clamp)
+        let expected_angle = 4.0 * delta + 0.5 * MAX_ANGULAR_ACCEL * delta * delta;
+        let delta_rotation = result.pose.orientation * motion.pose.orientation.inverse();
+        assert!((delta_rotation.to_scaled_axis().length() - expected_angle).abs() < 1e-4);
+
+        // linear accel = 2 / 0.02 = 100 m/s²
+        let expected_x = 1.0 + 2.0 * delta + 0.5 * 100.0 * delta * delta;
+        assert!((result.pose.position.x - expected_x).abs() < 1e-4);
+
+        // Velocities stay untouched (SteamVR extrapolates with them)
+        assert_eq!(result.linear_velocity, motion.linear_velocity);
+        assert_eq!(result.angular_velocity, motion.angular_velocity);
+    }
+
+    #[test]
+    fn quadratic_clamps_acceleration() {
+        let motion = motion_with_velocity(Vec3::new(0.0, 100.0, 0.0), Vec3::new(500.0, 0.0, 0.0));
+        let reference = motion_with_velocity(Vec3::ZERO, Vec3::ZERO);
+        let delta = 0.01;
+
+        let result = quadratic_predict(&motion, &reference, 0.02, delta).unwrap();
+
+        // Raw accel would be 5000 rad/s² and 25000 m/s², both clamped
+        let max_angle = 100.0 * delta + 0.5 * MAX_ANGULAR_ACCEL * delta * delta;
+        let delta_rotation = result.pose.orientation * motion.pose.orientation.inverse();
+        assert!(delta_rotation.to_scaled_axis().length() <= max_angle + 1e-4);
+        let max_x = 1.0 + 500.0 * delta + 0.5 * MAX_LINEAR_ACCEL * delta * delta;
+        assert!(result.pose.position.x <= max_x + 1e-4);
+    }
+
+    #[test]
+    fn short_baseline_falls_back_to_linear() {
+        let motion = motion_with_velocity(Vec3::new(1.0, 0.0, 0.0), Vec3::ZERO);
+        assert!(quadratic_predict(&motion, &motion, 0.001, 0.03).is_none());
+        assert!(quadratic_predict(&motion, &motion, 0.02, 0.0).is_none());
+    }
+
+    #[test]
+    fn acceleration_reference_spans_window() {
+        let base = Duration::from_millis(1000);
+        let mut motions: VecDeque<(Duration, DeviceMotion)> = VecDeque::new();
+        // Newest samples are pushed to the front
+        for offset_ms in [0u64, 3, 6, 23, 26] {
+            motions.push_front((
+                base + Duration::from_millis(offset_ms),
+                motion_with_velocity(Vec3::ZERO, Vec3::ZERO),
+            ));
+        }
+
+        let sample = base + Duration::from_millis(26);
+        let (timestamp, _) = find_acceleration_reference(&motions, sample).unwrap();
+        assert_eq!(timestamp, base + Duration::from_millis(6));
+
+        // Not enough history: falls back to the oldest sample
+        motions.truncate(2); // keeps 26 and 23
+        let (timestamp, _) = find_acceleration_reference(&motions, sample).unwrap();
+        assert_eq!(timestamp, base + Duration::from_millis(23));
     }
 }

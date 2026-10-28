@@ -78,8 +78,9 @@ RULES
 - One experiment at a time in Session B; revert before the next.
 - Keep the SustainedHigh performance level (Session A leaves it applied).
 - Stop rule: when two consecutive steps improve p99 by less than 1 ms, we stop.
-- Do NOT enable Quadratic prediction: it is broken (controllers start
-  misbehaving). Known issue, to be fixed separately.
+- Quadratic prediction was reworked (20 ms acceleration window, measured
+  velocities kept). It is opt-in: if controllers still misbehave with it,
+  switch back to Linear and report.
 
 
 TROUBLESHOOTING
