@@ -8,7 +8,24 @@ $ErrorActionPreference = "Stop"
 
 $root = $PSScriptRoot
 $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$out = Join-Path $root "captures\$stamp"
+
+# If the latest sequence wrote a schedule.json and its folder does not have telemetry yet,
+# collect into that folder; segment.py needs schedule.json next to client/ and server/.
+$out = $null
+$schedule_dirs = Get-ChildItem (Join-Path $root "captures") -Directory -ErrorAction SilentlyContinue |
+    Where-Object {
+        (Test-Path (Join-Path $_.FullName "schedule.json")) -and
+        -not (Test-Path (Join-Path $_.FullName "client")) -and
+        -not (Test-Path (Join-Path $_.FullName "server"))
+    } |
+    Sort-Object Name -Descending
+if ($schedule_dirs) {
+    $out = $schedule_dirs[0].FullName
+    Write-Host "Collecting into the latest sequence folder: $out"
+} else {
+    $out = Join-Path $root "captures\$stamp"
+}
+
 $clientOut = Join-Path $out "client"
 $serverOut = Join-Path $out "server"
 New-Item -ItemType Directory -Force -Path $clientOut, $serverOut | Out-Null
