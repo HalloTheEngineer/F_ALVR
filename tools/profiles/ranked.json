@@ -1,6 +1,6 @@
 {
     "name": "ranked",
-    "description": "Beat Saber ranked profile: 120Hz, H264, constant 300 Mbps, minimal latency, tracking extras off",
+    "description": "Beat Saber ranked profile (measured 28 Oct): AV1 native 2144x2240, 120Hz, SustainedHigh, pipeline_frames 1.0, divisor 6, interpolation on, 100 Mbps",
     "values": [
         {
             "path": [
@@ -17,7 +17,7 @@
                 "preferred_codec",
                 "variant"
             ],
-            "value": "H264"
+            "value": "AV1"
         },
         {
             "path": [
@@ -31,20 +31,11 @@
             "path": [
                 "session_settings",
                 "video",
-                "foveated_encoding",
-                "enabled"
-            ],
-            "value": false
-        },
-        {
-            "path": [
-                "session_settings",
-                "video",
                 "bitrate",
                 "mode"
             ],
             "value": {
-                "ConstantMbps": 300,
+                "ConstantMbps": 100,
                 "Adaptive": {
                     "gui_collapsed": true,
                     "saturation_multiplier": 0.95,
@@ -200,7 +191,7 @@
                 "headset",
                 "max_prediction_ms"
             ],
-            "value": 60
+            "value": 65
         },
         {
             "path": [
@@ -210,7 +201,7 @@
                 "content",
                 "steamvr_pipeline_frames"
             ],
-            "value": 2.0
+            "value": 1.0
         },
         {
             "path": [
@@ -242,6 +233,26 @@
                 "average_buffering_ms"
             ],
             "value": 40
+        },
+        {
+            "path": [
+                "session_settings",
+                "headset",
+                "controllers",
+                "content",
+                "input_poll_divisor"
+            ],
+            "value": 6
+        },
+        {
+            "path": [
+                "session_settings",
+                "headset",
+                "controllers",
+                "content",
+                "sample_interpolation"
+            ],
+            "value": true
         }
     ],
     "steamvr_restart": true
